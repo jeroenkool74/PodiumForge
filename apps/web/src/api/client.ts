@@ -10,7 +10,6 @@ import type {
   PublicTeamsResponse,
   RoundRecord,
   StandingEntry,
-  TieBreakRuleRecord,
   TokenResponse,
   TournamentCard,
   TournamentCreatePayload,
@@ -154,13 +153,6 @@ export const api = {
     request<RoundRecord>(`/tournaments/${tournamentId}/rounds/next`, { method: "POST" }, token),
   addParticipant: (token: string, tournamentId: string, payload: { display_name: string; directory_entry_id?: string; seed_number?: number; team_members?: string[] }) =>
     request<TournamentDetail["participants"][number]>(`/tournaments/${tournamentId}/participants`, { method: "POST", body: JSON.stringify(payload) }, token),
-  getTieBreakRules: (token: string, tournamentId: string) => request<TieBreakRuleRecord[]>(`/tournaments/${tournamentId}/tie-break-rules`, {}, token),
-  createTieBreakRule: (token: string, tournamentId: string, payload: Omit<TieBreakRuleRecord, "id">) =>
-    request<TieBreakRuleRecord>(`/tournaments/${tournamentId}/tie-break-rules`, { method: "POST", body: JSON.stringify(payload) }, token),
-  updateTieBreakRule: (token: string, tournamentId: string, ruleId: string, payload: Partial<Omit<TieBreakRuleRecord, "id">>) =>
-    request<TieBreakRuleRecord>(`/tournaments/${tournamentId}/tie-break-rules/${ruleId}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
-  deleteTieBreakRule: (token: string, tournamentId: string, ruleId: string) =>
-    request<{ deleted: boolean; rule_id: string }>(`/tournaments/${tournamentId}/tie-break-rules/${ruleId}`, { method: "DELETE" }, token),
 
   listDirectoryPlayers: (token: string) => request<DirectoryPlayer[]>("/directory/players", {}, token),
   createDirectoryPlayer: (token: string, payload: { name: string }) => request<DirectoryPlayer>("/directory/players", { method: "POST", body: JSON.stringify(payload) }, token),

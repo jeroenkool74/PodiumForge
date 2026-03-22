@@ -224,15 +224,6 @@ export interface MatchResultPayload {
   }>;
 }
 
-export interface TieBreakRuleRecord {
-  id: string;
-  name: string;
-  order_index: number;
-  config: {
-    rule_type: string;
-  };
-}
-
 export interface PublicTeam {
   id: string;
   name: string;

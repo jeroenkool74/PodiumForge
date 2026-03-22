@@ -15,16 +15,6 @@ import { advancementSummary, finalRoundLabel } from "../../tournaments/formatMet
 import { useAuth } from "../../auth/AuthContext";
 import { canDeleteTournament } from "../../auth/permissions";
 
-const tieBreakOptions = [
-  { value: "head_to_head", label: "Head-to-head" },
-  { value: "total_points", label: "Total points" },
-  { value: "best_rank", label: "Best rank" },
-  { value: "score_total", label: "Score total" },
-  { value: "matches_played", label: "Matches played" },
-  { value: "average_rank", label: "Average rank" },
-  { value: "display_name", label: "Display name" },
-];
-
 function formatPointsInput(pointsScheme: Array<{ placement: number; points: number }>) {
   return pointsScheme.map((item) => `${item.placement}:${item.points}`).join(", ");
 }
@@ -34,7 +24,6 @@ export function TournamentEditPage() {
   const { tournamentId } = useParams();
   const { token, user } = useAuth();
   const tournament = useApiResource(() => api.getManagedTournament(token ?? "", tournamentId ?? ""), [token, tournamentId]);
-  const tieBreakRules = useApiResource(() => api.getTieBreakRules(token ?? "", tournamentId ?? ""), [token, tournamentId]);
   const [form, setForm] = useState({ name: "", description: "", is_public: true, status: "LIVE" });
   const [pointsInput, setPointsInput] = useState("");
   const [addParticipantName, setAddParticipantName] = useState("");
@@ -50,8 +39,6 @@ export function TournamentEditPage() {
   const [addingParticipant, setAddingParticipant] = useState(false);
   const [updatingPoints, setUpdatingPoints] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
-  const [creatingTieBreak, setCreatingTieBreak] = useState(false);
-  const [pendingTieBreakType, setPendingTieBreakType] = useState("best_rank");
   const canDelete = canDeleteTournament(user);
   const tournamentDetail = tournament.data;
   const isSingleBracket = tournamentDetail?.format === "BRACKET";
@@ -100,10 +87,6 @@ export function TournamentEditPage() {
     setPointsInput(formatPointsInput(tournament.data.stages[0]?.points_scheme ?? []));
     setFormReady(true);
   }, [tournament.data]);
-
-  async function refreshAll() {
-    await Promise.all([tournament.refresh(), tieBreakRules.refresh(), directoryEntries.refresh()]);
-  }
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
@@ -230,57 +213,6 @@ export function TournamentEditPage() {
     }
   }
 
-  async function handleCreateTieBreak() {
-    if (creatingTieBreak) return;
-    setCreatingTieBreak(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const option = tieBreakOptions.find((item) => item.value === pendingTieBreakType);
-      await api.createTieBreakRule(token ?? "", tournamentId ?? "", {
-        name: option?.label ?? pendingTieBreakType,
-        order_index: tieBreakRules.data?.length ?? 0,
-        config: { rule_type: pendingTieBreakType },
-      });
-      setMessage("Tie-break rule added.");
-      await refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to add tie-break rule");
-    } finally {
-      setCreatingTieBreak(false);
-    }
-  }
-
-  async function moveTieBreak(ruleId: string, currentIndex: number, direction: -1 | 1) {
-    const nextIndex = currentIndex + direction;
-    if (!tieBreakRules.data || nextIndex < 0 || nextIndex >= tieBreakRules.data.length) return;
-    const current = tieBreakRules.data[currentIndex];
-    setMessage(null);
-    setError(null);
-    try {
-      await api.updateTieBreakRule(token ?? "", tournamentId ?? "", ruleId, {
-        name: current.name,
-        order_index: nextIndex,
-        config: current.config,
-      });
-      await refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to reorder tie-break rule");
-    }
-  }
-
-  async function deleteTieBreak(ruleId: string) {
-    setMessage(null);
-    setError(null);
-    try {
-      await api.deleteTieBreakRule(token ?? "", tournamentId ?? "", ruleId);
-      setMessage("Tie-break rule removed.");
-      await refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to delete tie-break rule");
-    }
-  }
-
   return (
     <PageShell mode="admin" title={tournamentDetail?.name ?? "Tournament management"} subtitle="Edit metadata, scoring, and live operations from one control room.">
       {tournament.loading ? <div className="card">Loading tournament...</div> : null}
@@ -377,7 +309,7 @@ export function TournamentEditPage() {
             </div>
           </section>
 
-          <section className="card two-column-card">
+          <section className="card">
             <div className="content-stack">
               <div className="section-heading">
                 <div>
@@ -400,38 +332,6 @@ export function TournamentEditPage() {
               <div className="button-row compact-row">
                 <button type="button" onClick={() => void handlePointsSave()} disabled={updatingPoints}>{updatingPoints ? "Saving..." : "Save points"}</button>
                 {hasExistingResults ? <button type="button" className="ghost-button" onClick={() => void handleRecalculatePoints()} disabled={recalculating}>{recalculating ? "Recalculating..." : "Recalculate results"}</button> : null}
-              </div>
-            </div>
-
-            <div className="content-stack">
-              <div className="section-heading">
-                <div>
-                  <h2>Tie-break rules</h2>
-                  <p className="muted-text">Carry over the v2 rule management flow while keeping the v1 standings engine.</p>
-                </div>
-              </div>
-              <div className="button-row compact-row">
-                <select value={pendingTieBreakType} onChange={(event) => setPendingTieBreakType(event.target.value)}>
-                  {tieBreakOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-                <button type="button" onClick={() => void handleCreateTieBreak()} disabled={creatingTieBreak}>{creatingTieBreak ? "Adding..." : "Add rule"}</button>
-              </div>
-              <div className="content-stack">
-                {tieBreakRules.data?.map((rule, index) => (
-                  <article key={rule.id} className="mini-card tie-break-card">
-                    <div className="card-header-row">
-                      <div>
-                        <strong>{rule.name}</strong>
-                        <div className="muted-text">{rule.config.rule_type.replace(/_/g, " ")}</div>
-                      </div>
-                      <div className="button-row compact-row">
-                        <button type="button" className="ghost-button" onClick={() => void moveTieBreak(rule.id, index, -1)} disabled={index === 0}>Up</button>
-                        <button type="button" className="ghost-button" onClick={() => void moveTieBreak(rule.id, index, 1)} disabled={index === (tieBreakRules.data?.length ?? 1) - 1}>Down</button>
-                        <button type="button" className="danger-button" onClick={() => void deleteTieBreak(rule.id)}>Delete</button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
               </div>
             </div>
           </section>
