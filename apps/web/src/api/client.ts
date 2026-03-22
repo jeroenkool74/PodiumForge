@@ -1,0 +1,247 @@
+import type {
+  ApiMessage,
+  AdminDashboardRecord,
+  DashboardRecord,
+  DirectoryPlayer,
+  DirectoryTeam,
+  MatchRecord,
+  MatchResultPayload,
+  ParticipantImportResult,
+  PublicTeamsResponse,
+  RoundRecord,
+  StandingEntry,
+  TieBreakRuleRecord,
+  TokenResponse,
+  TournamentCard,
+  TournamentConfigExport,
+  TournamentCreatePayload,
+  TournamentDetail,
+  TournamentUpdatePayload,
+  UserCreatePayload,
+  UserPasswordChangePayload,
+  UserRecord,
+  UserRolesUpdatePayload,
+} from "./types";
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
+
+function formatFieldLabel(path: Array<string | number>) {
+  const relevant = path.filter((segment) => segment !== "body");
+  if (!relevant.length) return "Field";
+  return relevant
+    .map((segment) => `${segment}`)
+    .join(" ")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatApiError(detail: unknown): string {
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+
+        if (item && typeof item === "object") {
+          const candidate = item as { loc?: Array<string | number>; msg?: string };
+          if (candidate.msg) {
+            const label = formatFieldLabel(candidate.loc ?? []);
+            return `${label}: ${candidate.msg}`;
+          }
+        }
+
+        return null;
+      })
+      .filter((message): message is string => Boolean(message));
+
+    if (messages.length) {
+      return messages.join(" ");
+    }
+  }
+
+  if (detail && typeof detail === "object") {
+    const candidate = detail as { message?: string };
+    if (candidate.message) {
+      return candidate.message;
+    }
+  }
+
+  return "Request failed";
+}
+
+async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    cache: init.cache ?? "no-store",
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = "Request failed";
+    try {
+      const errorBody = await response.json();
+      message = formatApiError(errorBody.detail ?? errorBody.message ?? errorBody);
+    } catch {
+      message = response.statusText || message;
+    }
+    throw new Error(message);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function download(path: string, filename: string, token: string) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let message = "Request failed";
+    try {
+      const errorBody = await response.json();
+      message = formatApiError(errorBody.detail ?? errorBody.message ?? errorBody);
+    } catch {
+      message = response.statusText || message;
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  window.URL.revokeObjectURL(url);
+}
+
+export const api = {
+  login: (login: string, password: string) =>
+    request<TokenResponse>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ login, password }),
+    }),
+  me: (token: string) => request<TokenResponse["user"]>("/auth/me", {}, token),
+  requestPasswordReset: (email: string) =>
+    request<ApiMessage>("/auth/password-reset/request", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  confirmPasswordReset: (token: string, password: string) =>
+    request<ApiMessage>("/auth/password-reset/confirm", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
+
+  listPublicTournaments: () => request<TournamentCard[]>("/public/tournaments"),
+  getPublicTournament: (slug: string) => request<TournamentDetail>(`/public/tournaments/${slug}`),
+  getPublicStandings: (slug: string) => request<StandingEntry[]>(`/public/tournaments/${slug}/standings`),
+  getPublicRound: (slug: string, roundId: string) => request<RoundRecord>(`/public/tournaments/${slug}/rounds/${roundId}`),
+  getPublicMatch: (matchId: string) => request<MatchRecord>(`/public/matches/${matchId}`),
+  getPublicTeams: (slug: string) => request<PublicTeamsResponse>(`/public/tournaments/${slug}/teams`),
+  getDashboard: (slug: string) => request<DashboardRecord>(`/public/tournaments/${slug}/dashboard`),
+
+  getAdminDashboard: (token: string) => request<AdminDashboardRecord>("/tournaments/dashboard", {}, token),
+  listManagedTournaments: (token: string) => request<TournamentCard[]>("/tournaments", {}, token),
+  getManagedTournament: (token: string, tournamentId: string) => request<TournamentDetail>(`/tournaments/${tournamentId}`, {}, token),
+  createTournament: (token: string, payload: TournamentCreatePayload) =>
+    request<TournamentDetail>("/tournaments", { method: "POST", body: JSON.stringify(payload) }, token),
+  updateTournament: (token: string, tournamentId: string, payload: TournamentUpdatePayload) =>
+    request<TournamentDetail>(`/tournaments/${tournamentId}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+  updatePointsScheme: (token: string, tournamentId: string, pointsScheme: TournamentConfigExport["points_scheme"]) =>
+    request<TournamentDetail>(`/tournaments/${tournamentId}/points-scheme`, { method: "PATCH", body: JSON.stringify({ points_scheme: pointsScheme }) }, token),
+  recalculatePoints: (token: string, tournamentId: string) =>
+    request<{ recalculated: number; total_results: number; message: string }>(`/tournaments/${tournamentId}/recalculate-points`, { method: "POST" }, token),
+  deleteTournament: (token: string, tournamentId: string) =>
+    request<void>(`/tournaments/${tournamentId}`, { method: "DELETE" }, token),
+  generateNextRound: (token: string, tournamentId: string) =>
+    request<RoundRecord>(`/tournaments/${tournamentId}/rounds/next`, { method: "POST" }, token),
+  addParticipant: (token: string, tournamentId: string, payload: { display_name: string; directory_entry_id?: string; seed_number?: number; team_members?: string[] }) =>
+    request<TournamentDetail["participants"][number]>(`/tournaments/${tournamentId}/participants`, { method: "POST", body: JSON.stringify(payload) }, token),
+  importParticipants: async (token: string, tournamentId: string, file: File): Promise<ParticipantImportResult> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<ParticipantImportResult>(`/tournaments/${tournamentId}/participants/import`, { method: "POST", body: formData }, token);
+  },
+  getTieBreakRules: (token: string, tournamentId: string) => request<TieBreakRuleRecord[]>(`/tournaments/${tournamentId}/tie-break-rules`, {}, token),
+  createTieBreakRule: (token: string, tournamentId: string, payload: Omit<TieBreakRuleRecord, "id">) =>
+    request<TieBreakRuleRecord>(`/tournaments/${tournamentId}/tie-break-rules`, { method: "POST", body: JSON.stringify(payload) }, token),
+  updateTieBreakRule: (token: string, tournamentId: string, ruleId: string, payload: Partial<Omit<TieBreakRuleRecord, "id">>) =>
+    request<TieBreakRuleRecord>(`/tournaments/${tournamentId}/tie-break-rules/${ruleId}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+  deleteTieBreakRule: (token: string, tournamentId: string, ruleId: string) =>
+    request<{ deleted: boolean; rule_id: string }>(`/tournaments/${tournamentId}/tie-break-rules/${ruleId}`, { method: "DELETE" }, token),
+  exportStandingsCsv: (token: string, tournamentId: string, slug: string) =>
+    download(`/tournaments/${tournamentId}/export/standings`, `${slug}-standings.csv`, token),
+  exportResultsCsv: (token: string, tournamentId: string, slug: string) =>
+    download(`/tournaments/${tournamentId}/export/results`, `${slug}-results.csv`, token),
+  exportTournamentConfig: (token: string, tournamentId: string) => request<TournamentConfigExport>(`/tournaments/${tournamentId}/export`, {}, token),
+  downloadTournamentConfig: async (token: string, tournamentId: string, slug: string) => {
+    const config = await api.exportTournamentConfig(token, tournamentId);
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${slug}-config.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
+  },
+  importTournamentConfig: (token: string, payload: TournamentConfigExport) =>
+    request<TournamentDetail>("/tournaments/import", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  listDirectoryPlayers: (token: string) => request<DirectoryPlayer[]>("/directory/players", {}, token),
+  createDirectoryPlayer: (token: string, payload: { name: string }) => request<DirectoryPlayer>("/directory/players", { method: "POST", body: JSON.stringify(payload) }, token),
+  updateDirectoryPlayer: (token: string, playerId: string, payload: { name: string }) => request<DirectoryPlayer>(`/directory/players/${playerId}`, { method: "PUT", body: JSON.stringify(payload) }, token),
+  deleteDirectoryPlayer: (token: string, playerId: string) => request<{ deleted: boolean; player_id: string }>(`/directory/players/${playerId}`, { method: "DELETE" }, token),
+  listDirectoryTeams: (token: string) => request<DirectoryTeam[]>("/directory/teams", {}, token),
+  createDirectoryTeam: (token: string, payload: { name: string; player_ids: string[] }) => request<DirectoryTeam>("/directory/teams", { method: "POST", body: JSON.stringify(payload) }, token),
+  updateDirectoryTeam: (token: string, teamId: string, payload: { name: string; player_ids: string[] }) => request<DirectoryTeam>(`/directory/teams/${teamId}`, { method: "PUT", body: JSON.stringify(payload) }, token),
+  deleteDirectoryTeam: (token: string, teamId: string) => request<{ deleted: boolean; team_id: string }>(`/directory/teams/${teamId}`, { method: "DELETE" }, token),
+
+  listUsers: (token: string) => request<UserRecord[]>("/users", {}, token),
+  createUser: (token: string, payload: UserCreatePayload) =>
+    request<UserRecord>("/users", { method: "POST", body: JSON.stringify(payload) }, token),
+  updateUserRoles: (token: string, userId: string, payload: UserRolesUpdatePayload) =>
+    request<UserRecord>(`/users/${userId}/roles`, { method: "PUT", body: JSON.stringify(payload) }, token),
+  changeUserPassword: (token: string, userId: string, payload: UserPasswordChangePayload) =>
+    request<void>(`/users/${userId}/password`, { method: "POST", body: JSON.stringify(payload) }, token),
+  deleteUser: (token: string, userId: string) =>
+    request<void>(`/users/${userId}`, { method: "DELETE" }, token),
+
+  getManagedMatch: (token: string, matchId: string) => request<MatchRecord>(`/matches/${matchId}`, {}, token),
+  saveMatchResults: (token: string, matchId: string, payload: MatchResultPayload) =>
+    request<MatchRecord>(`/matches/${matchId}/results`, { method: "POST", body: JSON.stringify(payload) }, token),
+  clearMatchResults: (token: string, matchId: string) => request<MatchRecord>(`/matches/${matchId}/results`, { method: "DELETE" }, token),
+  scheduleMatch: (token: string, matchId: string, scheduledAt: string | null) =>
+    request<MatchRecord>(`/matches/${matchId}/schedule`, { method: "PATCH", body: JSON.stringify({ scheduled_at: scheduledAt }) }, token),
+
+  getProtectedStandings: (token: string, tournamentId: string) => request<StandingEntry[]>(`/standings/tournaments/${tournamentId}`, {}, token),
+};

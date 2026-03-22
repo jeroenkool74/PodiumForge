@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+.env
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+data/

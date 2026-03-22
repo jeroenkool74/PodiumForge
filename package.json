@@ -1,0 +1,11 @@
+{
+  "name": "podiumforge",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=@podiumforge/web"
+  }
+}
