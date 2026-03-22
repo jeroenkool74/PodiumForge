@@ -9,6 +9,12 @@ from app.core.enums import (
     TournamentFormat,
     TournamentStatus,
 )
+from app.core.scoring import (
+    leaderboard_metric_for_settings,
+    score_direction_for_settings,
+    score_label_for_settings,
+    score_sort_value,
+)
 from app.core.tournament_formats import uses_table_standings
 from app.models import Match, MatchResult, Round, Tournament
 from app.services.tie_break_service import (
@@ -24,6 +30,29 @@ def sorted_rounds(tournament: Tournament) -> list[Round]:
             sorted(stage.rounds, key=lambda item: (item.number, item.order_index))
         )
     return rounds
+
+
+def primary_stage(tournament: Tournament):
+    return (
+        sorted(tournament.stages, key=lambda item: item.order_index)[0]
+        if tournament.stages
+        else None
+    )
+
+
+def leaderboard_metric_for_tournament(tournament: Tournament) -> str:
+    stage = primary_stage(tournament)
+    return leaderboard_metric_for_settings(stage.settings if stage else None)
+
+
+def score_direction_for_tournament(tournament: Tournament) -> str:
+    stage = primary_stage(tournament)
+    return score_direction_for_settings(stage.settings if stage else None)
+
+
+def score_label_for_tournament(tournament: Tournament) -> str:
+    stage = primary_stage(tournament)
+    return score_label_for_settings(stage.settings if stage else None)
 
 
 def current_round(tournament: Tournament) -> Round | None:
@@ -234,7 +263,7 @@ def calculate_final_placements(tournament: Tournament) -> dict[str, int]:
     if uses_table_standings(tournament.format):
         if tournament.status != TournamentStatus.COMPLETED.value:
             return {}
-        leaderboard = calculate_points_leaderboard(tournament)
+        leaderboard = calculate_leaderboard(tournament)
         return {
             entry["participant_id"]: index
             for index, entry in enumerate(leaderboard, start=1)
@@ -268,6 +297,7 @@ def calculate_final_placements(tournament: Tournament) -> dict[str, int]:
     )
 
     if final_completed_round:
+        score_direction = score_direction_for_tournament(tournament)
         finalists = sorted(
             [
                 result
@@ -276,20 +306,21 @@ def calculate_final_placements(tournament: Tournament) -> dict[str, int]:
             ],
             key=lambda item: (
                 item.rank,
-                -(item.score or 0),
+                score_sort_value(item.score, score_direction),
                 item.participant.display_name.lower(),
             ),
         )
         for result in finalists:
             placement_map[result.participant_id] = result.rank
 
+    score_direction = score_direction_for_tournament(tournament)
     for round_item in completed_rounds:
         for match in round_item.matches:
             ordered = sorted(
                 match.results,
                 key=lambda item: (
                     item.rank,
-                    -(item.score or 0),
+                    score_sort_value(item.score, score_direction),
                     item.participant.display_name.lower(),
                 ),
             )
@@ -299,8 +330,8 @@ def calculate_final_placements(tournament: Tournament) -> dict[str, int]:
                     round_item.number,
                     result.rank,
                     index,
-                    result.score,
-                    result.participant.display_name,
+                    score_sort_value(result.score, score_direction),
+                    result.participant.display_name.lower(),
                 )
                 if not existing or candidate[0] >= existing[0]:
                     deepest_results[result.participant_id] = candidate
@@ -322,8 +353,8 @@ def calculate_final_placements(tournament: Tournament) -> dict[str, int]:
             -item[1][0],
             item[1][1],
             item[1][2],
-            -(item[1][3] or 0),
-            item[1][4].lower(),
+            item[1][3],
+            item[1][4],
         ),
     )
     placement_cursor = start_placement
@@ -340,7 +371,7 @@ def calculate_final_placements(tournament: Tournament) -> dict[str, int]:
             ],
             key=lambda item: (
                 item.rank,
-                -(item.score or 0),
+                score_sort_value(item.score, score_direction),
                 item.participant.display_name.lower(),
             ),
         )
@@ -403,16 +434,22 @@ def _head_to_head_scores(
 
 
 def _tie_break_sort_values(
-    item: dict, rule_types: list[str], head_to_head_scores: dict[str, int]
+    item: dict,
+    rule_types: list[str],
+    head_to_head_scores: dict[str, int],
+    tournament: Tournament,
 ) -> tuple:
+    score_direction = score_direction_for_tournament(tournament)
     values = []
     for rule_type in rule_types:
         if rule_type == "HEAD_TO_HEAD":
             values.append(-head_to_head_scores.get(item["participant_id"], 0))
+        elif rule_type == "TOTAL_POINTS":
+            values.append(-item["total_points"])
         elif rule_type == "BEST_RANK":
             values.append(item["best_rank"] if item["best_rank"] is not None else 9999)
-        elif rule_type == "POINTS_DIFFERENTIAL":
-            values.append(-item.get("score_total", 0))
+        elif rule_type == "SCORE_TOTAL":
+            values.append(score_sort_value(item.get("score_total"), score_direction))
         elif rule_type == "MATCHES_PLAYED":
             values.append(-item["matches_played"])
         elif rule_type == "AVERAGE_RANK":
@@ -430,14 +467,27 @@ def _sorted_with_tie_breaks(entries: list[dict], tournament: Tournament) -> list
         tournament.tie_break_rules[0].rules if tournament.tie_break_rules else None
     )
     rule_types = [rule["rule_type"] for rule in normalized_rules]
-
-    grouped_by_points: dict[int, list[dict]] = defaultdict(list)
+    leaderboard_metric = leaderboard_metric_for_tournament(tournament)
+    grouped_by_value: dict[int | float, list[dict]] = defaultdict(list)
     for entry in entries:
-        grouped_by_points[entry["total_points"]].append(entry)
+        primary_value = (
+            entry["score_total"]
+            if leaderboard_metric == "SCORE"
+            else entry["total_points"]
+        )
+        grouped_by_value[primary_value].append(entry)
+
+    if leaderboard_metric == "SCORE":
+        ordered_primary_values = sorted(
+            grouped_by_value.keys(),
+            reverse=score_direction_for_tournament(tournament) == "HIGHER_IS_BETTER",
+        )
+    else:
+        ordered_primary_values = sorted(grouped_by_value.keys(), reverse=True)
 
     ordered_entries: list[dict] = []
-    for total_points in sorted(grouped_by_points.keys(), reverse=True):
-        tied_entries = grouped_by_points[total_points]
+    for primary_value in ordered_primary_values:
+        tied_entries = grouped_by_value[primary_value]
         head_to_head_scores = _head_to_head_scores(
             tournament, {entry["participant_id"] for entry in tied_entries}
         )
@@ -445,7 +495,7 @@ def _sorted_with_tie_breaks(entries: list[dict], tournament: Tournament) -> list
             sorted(
                 tied_entries,
                 key=lambda item: _tie_break_sort_values(
-                    item, rule_types, head_to_head_scores
+                    item, rule_types, head_to_head_scores, tournament
                 ),
             )
         )
@@ -453,9 +503,13 @@ def _sorted_with_tie_breaks(entries: list[dict], tournament: Tournament) -> list
     return ordered_entries
 
 
-def calculate_points_leaderboard(tournament: Tournament) -> list[dict]:
+def calculate_leaderboard(tournament: Tournament) -> list[dict]:
     entries = summarize_standings_rows(tournament)
     return _sorted_with_tie_breaks(entries, tournament)
+
+
+def calculate_points_leaderboard(tournament: Tournament) -> list[dict]:
+    return calculate_leaderboard(tournament)
 
 
 def calculate_standings(tournament: Tournament) -> list[dict]:
@@ -486,7 +540,7 @@ def calculate_standings(tournament: Tournament) -> list[dict]:
         entry["current_status"] = status
         entry["final_placement"] = provisional_placements.get(entry["participant_id"])
 
-    ordered = _sorted_with_tie_breaks(entries, tournament)
+    ordered = calculate_leaderboard(tournament)
     if alive_ids:
         alive_entries = [
             entry for entry in ordered if entry["participant_id"] in alive_ids
@@ -549,6 +603,8 @@ def serialize_match(match: Match) -> dict:
         "round_name": match.round.name,
         "is_bye": len(entrants) == 1,
         "results_locked": results_locked,
+        "score_label": score_label_for_settings(match.round.stage.settings),
+        "score_direction": score_direction_for_settings(match.round.stage.settings),
         "entrants": entrants,
     }
 
@@ -591,6 +647,9 @@ def serialize_stage_points(stage) -> list[dict]:
 
 def describe_advancement_rule(stage, advancement_rule) -> str | None:
     stage_format = stage.settings.get("format")
+    if stage_format == TournamentFormat.LEADERBOARD_SERIES.value:
+        total_rounds = int(stage.settings.get("round_count", 1) or 1)
+        return f"All entrants stay in for {total_rounds} scheduled rounds, and the running leaderboard decides the final order."
     if stage_format == TournamentFormat.ROUND_ROBIN.value:
         return "Each entrant plays every other entrant once, and the final table decides the champion."
     if stage_format == TournamentFormat.SWISS.value:
@@ -613,7 +672,9 @@ def describe_advancement_rule(stage, advancement_rule) -> str | None:
             return "Winners advance from each bracket match until a champion remains."
         return f"Top {top_n} from each match advance to the next round."
     if advancement_rule.kind == AdvancementKind.STANDINGS_TOP_N.value and top_n:
-        return f"Top {top_n} overall on points advance after each round."
+        return (
+            f"Top {top_n} overall on the running leaderboard advance after each round."
+        )
     return advancement_rule.kind
 
 
@@ -674,10 +735,18 @@ def serialize_tournament_detail(tournament: Tournament) -> dict:
                     if advancement_rule and advancement_rule.config.get("top_n")
                     else None
                 ),
+                "round_count": (
+                    int(stage.settings.get("round_count"))
+                    if stage.settings.get("round_count") is not None
+                    else None
+                ),
                 "points_scheme": serialize_stage_points(stage),
                 "tie_break_rules": tie_break_rule_labels(
                     stage.tie_break_rule.rules if stage.tie_break_rule else None
                 ),
+                "leaderboard_metric": leaderboard_metric_for_settings(stage.settings),
+                "score_direction": score_direction_for_settings(stage.settings),
+                "score_label": score_label_for_settings(stage.settings),
                 "rounds": rounds,
                 "advancement_summary": advancement_summary,
             }

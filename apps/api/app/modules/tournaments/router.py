@@ -168,6 +168,10 @@ def import_tournament_config_endpoint(
         directory_team_ids=[],
         points_scheme=payload.points_scheme,
         advance_count=payload.advance_count,
+        round_count=payload.round_count,
+        leaderboard_metric=payload.leaderboard_metric,
+        score_direction=payload.score_direction,
+        score_label=payload.score_label,
         is_public=payload.is_public,
     )
     tournament = create_tournament(db, create_payload, current_user)
@@ -628,7 +632,27 @@ def export_tournament_config_endpoint(
         participant_type=tournament.participant_type,
         match_size=primary_stage.settings.get("match_size") if primary_stage else 2,
         advance_count=advance_count,
+        round_count=(
+            int(primary_stage.settings.get("round_count"))
+            if primary_stage and primary_stage.settings.get("round_count") is not None
+            else None
+        ),
         is_public=tournament.is_public,
+        leaderboard_metric=(
+            primary_stage.settings.get("leaderboard_metric", "POINTS")
+            if primary_stage
+            else "POINTS"
+        ),
+        score_direction=(
+            primary_stage.settings.get("score_direction", "HIGHER_IS_BETTER")
+            if primary_stage
+            else "HIGHER_IS_BETTER"
+        ),
+        score_label=(
+            primary_stage.settings.get("score_label", "Score")
+            if primary_stage
+            else "Score"
+        ),
         points_scheme=[
             {"placement": int(placement), "points": int(points)}
             for placement, points in sorted(

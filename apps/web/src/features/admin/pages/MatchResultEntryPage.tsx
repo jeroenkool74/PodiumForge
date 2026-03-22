@@ -86,6 +86,8 @@ export function MatchResultEntryPage() {
   const isBye = match.data?.is_bye ?? false;
   const resultsLocked = match.data?.results_locked ?? false;
   const canUseQuickOrdering = rows.every((row, index) => row.rank.trim() === `${index + 1}` && !row.tie_group.trim());
+  const scoreLabel = match.data?.score_label ?? "Score";
+  const scoreDirectionLabel = match.data?.score_direction === "LOWER_IS_BETTER" ? "Lower is better" : "Higher is better";
   const initialRowsKey = [...(match.data?.entrants ?? [])]
     .sort((left, right) => (left.rank ?? left.slot_number) - (right.rank ?? right.slot_number))
     .map((entrant, index) => `${entrant.participant_id}:${entrant.rank ?? index + 1}:${entrant.score ?? ""}:${entrant.tie_group ?? ""}`)
@@ -243,16 +245,16 @@ export function MatchResultEntryPage() {
   }
 
   return (
-    <PageShell mode="admin" title={match.data?.name ?? "Match entry"} subtitle="Fast manual result entry with ranked finishing order, optional scores, and tie-group support.">
+    <PageShell mode="admin" title={match.data?.name ?? "Match entry"} subtitle={`Fast manual result entry with ranked finishing order, optional ${scoreLabel.toLowerCase()} values, and tie-group support.`}>
       {match.loading ? <div className="card">Loading match...</div> : null}
       {match.error ? <div className="card error-card">{match.error}</div> : null}
       {match.data ? (
         <form className="card content-stack" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
-          <div className="card-header-row">
-            <div>
-              <h2>{match.data.name}</h2>
-              <p className="muted-text">Use the arrows for quick ordering, or type place numbers directly for ties. Shared places must also share one tie group.</p>
-            </div>
+            <div className="card-header-row">
+              <div>
+                <h2>{match.data.name}</h2>
+                <p className="muted-text">Use the arrows for quick ordering, or type place numbers directly for ties. Shared places must also share one tie group. {scoreLabel} guidance: {scoreDirectionLabel}.</p>
+              </div>
             <div className="button-row compact-row">
               <Link to={`/admin/tournaments/${match.data.tournament_id}`}>Back to tournament</Link>
               <Link to="/admin">Back to admin</Link>
@@ -295,7 +297,7 @@ export function MatchResultEntryPage() {
                     <input type="number" min={1} required value={row.rank} onChange={(event) => setRows((current) => current.map((item) => item.participant_id === row.participant_id ? { ...item, rank: event.target.value } : item))} />
                   </label>
                   <label>
-                    <span>Score</span>
+                    <span>{scoreLabel}</span>
                     <input type="number" step="any" inputMode="decimal" value={row.score} onChange={(event) => setRows((current) => current.map((item) => item.participant_id === row.participant_id ? { ...item, score: event.target.value } : item))} />
                   </label>
                   <label>

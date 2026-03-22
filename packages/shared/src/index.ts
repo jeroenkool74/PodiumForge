@@ -1,10 +1,11 @@
 export type RoleName = "ADMIN" | "TOURNAMENT_EDITOR";
-export type TournamentFormat = "FFA_ELIMINATION" | "GROUP_POINTS" | "ROUND_ROBIN" | "SWISS" | "PAGE_PLAYOFF" | "STANDALONE_MATCH" | "BRACKET" | "DOUBLE_ELIMINATION";
+export type TournamentFormat = "FFA_ELIMINATION" | "GROUP_POINTS" | "LEADERBOARD_SERIES" | "ROUND_ROBIN" | "SWISS" | "PAGE_PLAYOFF" | "STANDALONE_MATCH" | "BRACKET" | "DOUBLE_ELIMINATION";
 export type ParticipantType = "PLAYER" | "TEAM";
 
 export const tournamentFormatLabels: Record<TournamentFormat, string> = {
   FFA_ELIMINATION: "Free-for-all elimination",
   GROUP_POINTS: "Group points format",
+  LEADERBOARD_SERIES: "Leaderboard series",
   ROUND_ROBIN: "Round-robin league",
   SWISS: "Swiss system",
   PAGE_PLAYOFF: "Page playoff",

@@ -4,7 +4,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
-from app.core.enums import TournamentFormat, TournamentParticipantType, TournamentStatus
+from app.core.enums import (
+    LeaderboardMetric,
+    ScoreDirection,
+    TournamentFormat,
+    TournamentParticipantType,
+    TournamentStatus,
+)
+from app.core.scoring import DEFAULT_SCORE_LABEL
 from app.core.tournament_formats import requires_manual_advance_count
 
 
@@ -24,6 +31,10 @@ class TournamentCreateRequest(BaseModel):
     directory_team_ids: list[str] = Field(default_factory=list, max_length=256)
     points_scheme: list[PlacementPointsInput] = Field(default_factory=list)
     advance_count: int | None = Field(default=None, ge=1, le=64)
+    round_count: int | None = Field(default=None, ge=1, le=64)
+    leaderboard_metric: LeaderboardMetric = Field(default=LeaderboardMetric.POINTS)
+    score_direction: ScoreDirection = Field(default=ScoreDirection.HIGHER_IS_BETTER)
+    score_label: str = Field(default=DEFAULT_SCORE_LABEL, max_length=40)
     is_public: bool = True
 
     @field_validator("name")
@@ -38,6 +49,12 @@ class TournamentCreateRequest(BaseModel):
     @classmethod
     def normalize_description(cls, value: str) -> str:
         return value.strip()
+
+    @field_validator("score_label")
+    @classmethod
+    def normalize_score_label(cls, value: str) -> str:
+        normalized = value.strip()
+        return normalized or DEFAULT_SCORE_LABEL
 
     @field_validator("participants")
     @classmethod
@@ -77,6 +94,22 @@ class TournamentCreateRequest(BaseModel):
             and self.advance_count >= self.match_size
         ):
             raise ValueError("Advance count must be smaller than the match size")
+
+        if self.format == TournamentFormat.LEADERBOARD_SERIES:
+            if self.advance_count is not None:
+                raise ValueError(
+                    "Leaderboard series uses a fixed round count instead of elimination advancement"
+                )
+            if self.round_count is None:
+                raise ValueError("Leaderboard series requires a scheduled round count")
+
+        if (
+            self.round_count is not None
+            and self.format != TournamentFormat.LEADERBOARD_SERIES
+        ):
+            raise ValueError(
+                "Round count is currently only configurable for leaderboard series tournaments"
+            )
 
         if self.format == TournamentFormat.DOUBLE_ELIMINATION:
             participant_count = len(self.participants)
@@ -179,6 +212,8 @@ class MatchRead(BaseModel):
     round_name: str
     is_bye: bool = False
     results_locked: bool = False
+    score_label: str = DEFAULT_SCORE_LABEL
+    score_direction: str = ScoreDirection.HIGHER_IS_BETTER.value
     entrants: list[MatchParticipantRead]
 
 
@@ -199,8 +234,12 @@ class StageRead(BaseModel):
     match_size: int | None
     advancement_kind: str | None = None
     advance_count: int | None = None
+    round_count: int | None = None
     points_scheme: list[PlacementPointsInput] = Field(default_factory=list)
     tie_break_rules: list[str] = Field(default_factory=list)
+    leaderboard_metric: str = LeaderboardMetric.POINTS.value
+    score_direction: str = ScoreDirection.HIGHER_IS_BETTER.value
+    score_label: str = DEFAULT_SCORE_LABEL
     rounds: list[RoundRead]
     advancement_summary: str | None
 
@@ -209,6 +248,7 @@ class StandingEntryRead(BaseModel):
     participant_id: str
     display_name: str
     total_points: int
+    score_total: float
     matches_played: int
     best_rank: int | None
     average_rank: float | None
@@ -302,7 +342,11 @@ class TournamentConfigExportRead(BaseModel):
     participant_type: str
     match_size: int
     advance_count: int | None = None
+    round_count: int | None = None
     is_public: bool
+    leaderboard_metric: str = LeaderboardMetric.POINTS.value
+    score_direction: str = ScoreDirection.HIGHER_IS_BETTER.value
+    score_label: str = DEFAULT_SCORE_LABEL
     points_scheme: list[PlacementPointsInput] = Field(default_factory=list)
     tie_break_rules: list[TieBreakRuleItemRead] = Field(default_factory=list)
     participants: list[TournamentConfigParticipantInput] = Field(default_factory=list)
@@ -315,7 +359,11 @@ class TournamentConfigImportRequest(BaseModel):
     participant_type: TournamentParticipantType
     match_size: int = Field(default=5, ge=2, le=64)
     advance_count: int | None = Field(default=None, ge=1, le=64)
+    round_count: int | None = Field(default=None, ge=1, le=64)
     is_public: bool = True
+    leaderboard_metric: LeaderboardMetric = Field(default=LeaderboardMetric.POINTS)
+    score_direction: ScoreDirection = Field(default=ScoreDirection.HIGHER_IS_BETTER)
+    score_label: str = Field(default=DEFAULT_SCORE_LABEL, max_length=40)
     points_scheme: list[PlacementPointsInput] = Field(default_factory=list)
     tie_break_rules: list[TieBreakRuleItemRead] = Field(default_factory=list)
     participants: list[TournamentConfigParticipantInput] = Field(default_factory=list)

@@ -41,6 +41,9 @@ export function StandingsPage() {
           advanceCount={primaryStage?.advance_count}
           advancementSummary={primaryStage?.advancement_summary}
           tieBreakRules={primaryStage?.tie_break_rules}
+          leaderboardMetric={primaryStage?.leaderboard_metric}
+          scoreDirection={primaryStage?.score_direction}
+          scoreLabel={primaryStage?.score_label}
         />
       ) : null}
     </PageShell>

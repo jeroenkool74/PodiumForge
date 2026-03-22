@@ -15,6 +15,14 @@ from app.core.enums import (
     TournamentFormat,
     TournamentStatus,
 )
+from app.core.scoring import (
+    DEFAULT_LEADERBOARD_METRIC,
+    DEFAULT_SCORE_DIRECTION,
+    DEFAULT_SCORE_LABEL,
+    normalize_leaderboard_metric,
+    normalize_score_direction,
+    normalize_score_label,
+)
 from app.core.tournament_formats import (
     requires_manual_advance_count,
     uses_fixed_head_to_head_matches,
@@ -69,8 +77,14 @@ def ensure_unique_slug(db: Session, name: str) -> str:
 
 def build_points_mapping(points_scheme: list) -> dict[str, int]:
     if not points_scheme:
-        return {"1": 10, "2": 7, "3": 5, "4": 3, "5": 1}
+        return {}
     return {str(item.placement): item.points for item in points_scheme}
+
+
+def default_points_mapping(format_value: TournamentFormat) -> dict[str, int]:
+    if uses_fixed_head_to_head_matches(format_value):
+        return {"1": 3, "2": 0}
+    return {"1": 10, "2": 7, "3": 5, "4": 3, "5": 1}
 
 
 DOUBLE_ELIMINATION_WINNERS = "WINNERS"
@@ -281,11 +295,12 @@ def create_tournament(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Advance count is required for multi-match formats",
         )
-    points_mapping = (
-        {"1": 3, "2": 0}
-        if uses_fixed_head_to_head_matches(payload.format) and not payload.points_scheme
-        else build_points_mapping(payload.points_scheme)
-    )
+    leaderboard_metric = normalize_leaderboard_metric(payload.leaderboard_metric.value)
+    score_direction = normalize_score_direction(payload.score_direction.value)
+    score_label = normalize_score_label(payload.score_label)
+    points_mapping = build_points_mapping(payload.points_scheme)
+    if not points_mapping and leaderboard_metric == DEFAULT_LEADERBOARD_METRIC:
+        points_mapping = default_points_mapping(payload.format)
     if payload.format == TournamentFormat.PAGE_PLAYOFF and len(names) != 4:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -322,9 +337,17 @@ def create_tournament(
         settings={
             "match_size": effective_match_size,
             "format": payload.format.value,
+            "leaderboard_metric": leaderboard_metric,
+            "score_direction": score_direction,
+            "score_label": score_label,
             **(
                 {"field_size": len(names)}
                 if payload.format == TournamentFormat.DOUBLE_ELIMINATION
+                else {}
+            ),
+            **(
+                {"round_count": payload.round_count or 1}
+                if payload.format == TournamentFormat.LEADERBOARD_SERIES
                 else {}
             ),
             **(
@@ -392,6 +415,10 @@ def create_tournament(
             [participants[2], participants[3]],
         ]
         is_final = False
+    elif payload.format == TournamentFormat.LEADERBOARD_SERIES:
+        round_name = "Round 1"
+        groups = chunk_participants(participants, effective_match_size)
+        is_final = (payload.round_count or 1) == 1
     elif payload.format == TournamentFormat.BRACKET:
         field_size = next_power_of_two(len(participants))
         bracket_slots = [
@@ -440,6 +467,7 @@ def create_tournament(
         else None
         if payload.format
         in {
+            TournamentFormat.LEADERBOARD_SERIES,
             TournamentFormat.ROUND_ROBIN,
             TournamentFormat.SWISS,
             TournamentFormat.PAGE_PLAYOFF,

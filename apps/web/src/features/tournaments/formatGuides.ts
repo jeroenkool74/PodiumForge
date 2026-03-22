@@ -14,6 +14,7 @@ export interface FormatGuide {
 export const tournamentFormatOrder: TournamentFormat[] = [
   "FFA_ELIMINATION",
   "GROUP_POINTS",
+  "LEADERBOARD_SERIES",
   "ROUND_ROBIN",
   "SWISS",
   "PAGE_PLAYOFF",
@@ -41,7 +42,7 @@ export const tournamentFormatGuides: Record<TournamentFormat, FormatGuide> = {
     ],
   },
   GROUP_POINTS: {
-    label: tournamentFormatLabels.GROUP_POINTS,
+    label: "Group leaderboard format",
     tagline: "Everyone chases one running leaderboard.",
     description: "Entrants still play in groups, but qualification is based on total points across the round instead of finishing top N inside one specific match.",
     bestFor: "Leagues, Swiss-like multiplayer events, or formats where consistency across multiple tables should matter most.",
@@ -55,6 +56,23 @@ export const tournamentFormatGuides: Record<TournamentFormat, FormatGuide> = {
       { label: "Groups", slots: ["Match A", "Match B", "Match C"] },
       { label: "Leaderboard", slots: ["Total points ranking"] },
       { label: "Advance", slots: ["Top overall continue"] },
+    ],
+  },
+  LEADERBOARD_SERIES: {
+    label: tournamentFormatLabels.LEADERBOARD_SERIES,
+    tagline: "Fixed rounds, one running leaderboard.",
+    description: "The full field stays alive for a scheduled number of grouped rounds while one cumulative leaderboard decides the champion at the end.",
+    bestFor: "Repeated races, map rotations, heats, and any event where several rounds should roll into one final table without eliminations.",
+    steps: [
+      "Seed entrants into the opening groups.",
+      "Run the configured number of rounds with the same full field still active.",
+      "Lock the final order from the cumulative leaderboard after the last scheduled round.",
+    ],
+    scoringHint: "Choose whether the running leaderboard should follow total points or total score, then use the score direction to decide whether higher or lower values are better.",
+    preview: [
+      { label: "Round 1", slots: ["Opening groups"] },
+      { label: "Running table", slots: ["Cumulative leaderboard"] },
+      { label: "Finish", slots: ["Champion by totals"] },
     ],
   },
   ROUND_ROBIN: {
@@ -184,9 +202,11 @@ export function estimateRoundCount(
   participantCount: number,
   matchSize: number,
   advanceCount: number | null | undefined,
+  roundCount?: number | null,
 ): number {
   if (participantCount <= 1) return 0;
   if (format === "STANDALONE_MATCH") return 1;
+  if (format === "LEADERBOARD_SERIES") return Math.max(1, roundCount ?? 1);
   if (format === "ROUND_ROBIN") {
     if (participantCount <= 1) return 0;
     return participantCount % 2 === 0 ? participantCount - 1 : participantCount;

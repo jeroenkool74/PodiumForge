@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.enums import MatchStatus, RoundStatus
+from app.core.scoring import score_sort_value
 from app.core.tournament_formats import uses_fixed_head_to_head_matches
 from app.models import Match, MatchResult
 from app.schemas.match import MatchResultsUpsertRequest
@@ -26,9 +27,14 @@ def _validate_boundary_ties(match: Match, payload: MatchResultsUpsertRequest) ->
     if not rule or rule.kind != "MATCH_TOP_N":
         return
     top_n = int(rule.config.get("top_n", 0))
+    score_direction = match.round.stage.settings.get("score_direction")
     ordered = sorted(
         payload.results,
-        key=lambda item: (item.rank, -(item.score or 0), item.participant_id),
+        key=lambda item: (
+            item.rank,
+            score_sort_value(item.score, score_direction),
+            item.participant_id,
+        ),
     )
     if len(ordered) <= top_n or top_n <= 0:
         return

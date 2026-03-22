@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.enums import AdvancementKind, MatchStatus, RoundStatus, TournamentFormat
+from app.core.scoring import score_sort_value
 from app.models import (
     AdvancementRule,
     Match,
@@ -90,6 +91,10 @@ def is_double_elimination_stage(stage) -> bool:
 
 def is_round_robin_stage(stage) -> bool:
     return stage.settings.get("format") == TournamentFormat.ROUND_ROBIN.value
+
+
+def is_leaderboard_series_stage(stage) -> bool:
+    return stage.settings.get("format") == TournamentFormat.LEADERBOARD_SERIES.value
 
 
 def is_swiss_stage(stage) -> bool:
@@ -194,6 +199,23 @@ def swiss_total_rounds(stage) -> int:
     if participant_count <= 1:
         return 0
     return (participant_count - 1).bit_length()
+
+
+def leaderboard_series_total_rounds(stage) -> int:
+    configured = int(stage.settings.get("round_count", 0) or 0)
+    return configured or 1
+
+
+def resolve_seeded_groups(stage) -> list[list[Participant]]:
+    participants = sorted(
+        stage.tournament.participants,
+        key=lambda item: (item.seed_number or 9999, item.display_name.lower()),
+    )
+    match_size = max(2, int(stage.settings.get("match_size", 5) or 5))
+    return [
+        participants[index : index + match_size]
+        for index in range(0, len(participants), match_size)
+    ]
 
 
 def resolve_round_robin_groups(stage, round_number: int) -> list[list[Participant]]:
@@ -584,13 +606,14 @@ def create_double_elimination_round(db: Session, tournament: Tournament) -> Roun
 
 
 def sort_results_for_advancement(
-    results: list[MatchResult], top_n: int
+    round_item: Round, results: list[MatchResult], top_n: int
 ) -> list[MatchResult]:
+    score_direction = round_item.stage.settings.get("score_direction")
     ranked = sorted(
         results,
         key=lambda item: (
             item.rank,
-            -(item.score or 0),
+            score_sort_value(item.score, score_direction),
             item.participant.display_name.lower(),
         ),
     )
@@ -612,7 +635,7 @@ def sort_results_for_advancement(
         ranked,
         key=lambda item: (
             item.rank,
-            -(item.score or 0),
+            score_sort_value(item.score, score_direction),
             item.participant.display_name.lower(),
         ),
     )
@@ -627,14 +650,16 @@ def get_advancing_participants(round_item: Round) -> list[Participant]:
 
     if rule.kind == AdvancementKind.MATCH_TOP_N.value:
         for match in sorted(round_item.matches, key=lambda item: item.sequence):
-            ordered_results = sort_results_for_advancement(list(match.results), top_n)
+            ordered_results = sort_results_for_advancement(
+                round_item, list(match.results), top_n
+            )
             advancing.extend(result.participant for result in ordered_results[:top_n])
         return advancing
 
     if rule.kind == AdvancementKind.STANDINGS_TOP_N.value:
-        from app.services.standings_service import calculate_points_leaderboard
+        from app.services.standings_service import calculate_leaderboard
 
-        leaderboard = calculate_points_leaderboard(round_item.stage.tournament)
+        leaderboard = calculate_leaderboard(round_item.stage.tournament)
         advancing_ids = [entry["participant_id"] for entry in leaderboard[:top_n]]
         lookup = {
             participant.id: participant
@@ -697,6 +722,94 @@ def create_round_robin_round(db: Session, tournament: Tournament) -> Round:
         )
 
     groups = resolve_round_robin_groups(stage, next_number)
+    next_round = Round(
+        stage=stage,
+        name=f"Round {next_number}",
+        number=next_number,
+        order_index=next_number,
+        status=RoundStatus.ACTIVE.value,
+        is_final=next_number == total_rounds,
+        settings={"generated_from_round": latest.number},
+    )
+    db.add(next_round)
+
+    for match_index, group in enumerate(groups, start=1):
+        match_name = (
+            f"Match {chr(64 + match_index)}" if len(groups) > 1 else next_round.name
+        )
+        match = Match(
+            round=next_round,
+            name=match_name,
+            sequence=match_index,
+            status=MatchStatus.SCHEDULED.value,
+            settings={"group_size": len(group)},
+        )
+        db.add(match)
+        for slot_index, participant in enumerate(group, start=1):
+            db.add(
+                MatchParticipant(
+                    match=match,
+                    participant=participant,
+                    slot_number=slot_index,
+                    seed_number=participant.seed_number,
+                )
+            )
+
+    refresh_tournament_status(tournament)
+    db.commit()
+    db.refresh(next_round)
+    return next_round
+
+
+def can_generate_leaderboard_series_round(tournament: Tournament) -> bool:
+    stage = main_stage(tournament)
+    rounds = ordered_stage_rounds(stage)
+    if not rounds:
+        return False
+
+    latest = rounds[-1]
+    if any(match.status != MatchStatus.COMPLETED.value for match in latest.matches):
+        return False
+
+    return latest.number < leaderboard_series_total_rounds(stage)
+
+
+def create_leaderboard_series_round(db: Session, tournament: Tournament) -> Round:
+    stage = main_stage(tournament)
+    rounds = ordered_stage_rounds(stage)
+    if not rounds:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Tournament has no rounds"
+        )
+
+    latest = rounds[-1]
+    if latest.settings.get("generated_from_round") and not any(
+        match.status == MatchStatus.COMPLETED.value or match.results
+        for match in latest.matches
+    ):
+        return latest
+
+    if any(match.status != MatchStatus.COMPLETED.value for match in latest.matches):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Finish the current round first",
+        )
+
+    total_rounds = leaderboard_series_total_rounds(stage)
+    if latest.number >= total_rounds:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tournament is already at the final round",
+        )
+
+    next_number = latest.number + 1
+    if any(round_item.number == next_number for round_item in rounds):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Next round already exists",
+        )
+
+    groups = resolve_seeded_groups(stage)
     next_round = Round(
         stage=stage,
         name=f"Round {next_number}",
@@ -987,6 +1100,11 @@ def special_round_handler(stage):
             is_double_elimination_stage,
             can_generate_double_elimination_round,
             create_double_elimination_round,
+        ),
+        (
+            is_leaderboard_series_stage,
+            can_generate_leaderboard_series_round,
+            create_leaderboard_series_round,
         ),
         (
             is_round_robin_stage,

@@ -17,8 +17,9 @@ import { canDeleteTournament } from "../../auth/permissions";
 
 const tieBreakOptions = [
   { value: "head_to_head", label: "Head-to-head" },
+  { value: "total_points", label: "Total points" },
   { value: "best_rank", label: "Best rank" },
-  { value: "points_differential", label: "Points differential" },
+  { value: "score_total", label: "Score total" },
   { value: "matches_played", label: "Matches played" },
   { value: "average_rank", label: "Average rank" },
   { value: "display_name", label: "Display name" },
@@ -474,6 +475,10 @@ export function TournamentEditPage() {
             participantCount={tournamentDetail.participants.length}
             matchSize={tournamentDetail.stages[0]?.match_size ?? null}
             advanceCount={tournamentDetail.stages[0]?.advance_count ?? null}
+            roundCount={tournamentDetail.stages[0]?.round_count ?? null}
+            leaderboardMetric={tournamentDetail.stages[0]?.leaderboard_metric}
+            scoreDirection={tournamentDetail.stages[0]?.score_direction}
+            scoreLabel={tournamentDetail.stages[0]?.score_label}
             pointsScheme={tournamentDetail.stages[0]?.points_scheme ?? []}
             heading="Format explainer"
           />
@@ -534,6 +539,9 @@ export function TournamentEditPage() {
             advanceCount={tournamentDetail.stages[0]?.advance_count}
             advancementSummary={tournamentDetail.stages[0]?.advancement_summary}
             tieBreakRules={tournamentDetail.stages[0]?.tie_break_rules}
+            leaderboardMetric={tournamentDetail.stages[0]?.leaderboard_metric}
+            scoreDirection={tournamentDetail.stages[0]?.score_direction}
+            scoreLabel={tournamentDetail.stages[0]?.score_label}
           />
         </>
       ) : null}

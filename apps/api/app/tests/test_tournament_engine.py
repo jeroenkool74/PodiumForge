@@ -4,7 +4,12 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.enums import TournamentFormat, TournamentParticipantType
+from app.core.enums import (
+    LeaderboardMetric,
+    ScoreDirection,
+    TournamentFormat,
+    TournamentParticipantType,
+)
 from app.models import User
 from app.repositories.tournaments import get_tournament_by_identifier
 from app.schemas.match import MatchResultInput, MatchResultsUpsertRequest
@@ -261,6 +266,239 @@ def test_group_points_advances_from_shared_leaderboard(db_session: Session) -> N
         slot.participant.display_name for slot in final_match.participants
     )
     assert finalists == ["A", "B", "E", "F"]
+
+
+def test_group_points_can_advance_from_score_leaderboard(db_session: Session) -> None:
+    tournament = create_tournament(
+        db_session,
+        TournamentCreateRequest(
+            name="Score Ladder",
+            description="demo",
+            format=TournamentFormat.GROUP_POINTS,
+            participant_type=TournamentParticipantType.PLAYER,
+            match_size=4,
+            participants=["A", "B", "C", "D", "E", "F", "G", "H"],
+            points_scheme=[],
+            advance_count=4,
+            leaderboard_metric=LeaderboardMetric.SCORE,
+            score_direction=ScoreDirection.LOWER_IS_BETTER,
+            score_label="Time",
+        ),
+        admin_user(db_session),
+    )
+    round_one = tournament.stages[0].rounds[0]
+    match_a, match_b = sorted(round_one.matches, key=lambda item: item.sequence)
+    a_lookup = {
+        slot.participant.display_name: slot.participant_id
+        for slot in match_a.participants
+    }
+    b_lookup = {
+        slot.participant.display_name: slot.participant_id
+        for slot in match_b.participants
+    }
+
+    upsert_match_results(
+        db_session,
+        match_a,
+        MatchResultsUpsertRequest(
+            results=[
+                MatchResultInput(participant_id=a_lookup["A"], rank=1, score=40),
+                MatchResultInput(participant_id=a_lookup["B"], rank=2, score=42),
+                MatchResultInput(participant_id=a_lookup["C"], rank=3, score=49),
+                MatchResultInput(participant_id=a_lookup["D"], rank=4, score=55),
+            ]
+        ),
+    )
+    upsert_match_results(
+        db_session,
+        match_b,
+        MatchResultsUpsertRequest(
+            results=[
+                MatchResultInput(participant_id=b_lookup["E"], rank=1, score=39),
+                MatchResultInput(participant_id=b_lookup["F"], rank=2, score=41),
+                MatchResultInput(participant_id=b_lookup["G"], rank=3, score=50),
+                MatchResultInput(participant_id=b_lookup["H"], rank=4, score=57),
+            ]
+        ),
+    )
+
+    refreshed = get_tournament_by_identifier(
+        db_session, tournament.id, public_only=False
+    )
+    assert refreshed is not None
+    next_round = generate_next_round(db_session, refreshed)
+    assert next_round.name == "Final"
+
+    after_generation = get_tournament_by_identifier(
+        db_session, tournament.id, public_only=False
+    )
+    assert after_generation is not None
+    final_match = after_generation.stages[0].rounds[-1].matches[0]
+    finalists = sorted(
+        slot.participant.display_name for slot in final_match.participants
+    )
+    assert finalists == ["A", "B", "E", "F"]
+
+
+def test_leaderboard_series_uses_fixed_rounds_and_score_totals(
+    db_session: Session,
+) -> None:
+    tournament = create_tournament(
+        db_session,
+        TournamentCreateRequest(
+            name="Measured Series",
+            description="demo",
+            format=TournamentFormat.LEADERBOARD_SERIES,
+            participant_type=TournamentParticipantType.PLAYER,
+            match_size=3,
+            participants=["A", "B", "C", "D", "E", "F"],
+            points_scheme=[],
+            round_count=3,
+            leaderboard_metric=LeaderboardMetric.SCORE,
+            score_direction=ScoreDirection.LOWER_IS_BETTER,
+            score_label="Time",
+        ),
+        admin_user(db_session),
+    )
+
+    round_one = tournament.stages[0].rounds[0]
+    match_a, match_b = sorted(round_one.matches, key=lambda item: item.sequence)
+    a_lookup = {
+        slot.participant.display_name: slot.participant_id
+        for slot in match_a.participants
+    }
+    b_lookup = {
+        slot.participant.display_name: slot.participant_id
+        for slot in match_b.participants
+    }
+    upsert_match_results(
+        db_session,
+        match_a,
+        MatchResultsUpsertRequest(
+            results=[
+                MatchResultInput(participant_id=a_lookup["A"], rank=1, score=10),
+                MatchResultInput(participant_id=a_lookup["B"], rank=2, score=12),
+                MatchResultInput(participant_id=a_lookup["C"], rank=3, score=14),
+            ]
+        ),
+    )
+    upsert_match_results(
+        db_session,
+        match_b,
+        MatchResultsUpsertRequest(
+            results=[
+                MatchResultInput(participant_id=b_lookup["D"], rank=1, score=9),
+                MatchResultInput(participant_id=b_lookup["E"], rank=2, score=13),
+                MatchResultInput(participant_id=b_lookup["F"], rank=3, score=18),
+            ]
+        ),
+    )
+
+    refreshed = get_tournament_by_identifier(
+        db_session, tournament.id, public_only=False
+    )
+    assert refreshed is not None
+    round_two = generate_next_round(db_session, refreshed)
+    assert round_two.number == 2
+    assert not round_two.is_final
+
+    match_a, match_b = sorted(round_two.matches, key=lambda item: item.sequence)
+    a_lookup = {
+        slot.participant.display_name: slot.participant_id
+        for slot in match_a.participants
+    }
+    b_lookup = {
+        slot.participant.display_name: slot.participant_id
+        for slot in match_b.participants
+    }
+    upsert_match_results(
+        db_session,
+        match_a,
+        MatchResultsUpsertRequest(
+            results=[
+                MatchResultInput(participant_id=a_lookup["A"], rank=2, score=11),
+                MatchResultInput(participant_id=a_lookup["B"], rank=1, score=10),
+                MatchResultInput(participant_id=a_lookup["C"], rank=3, score=16),
+            ]
+        ),
+    )
+    upsert_match_results(
+        db_session,
+        match_b,
+        MatchResultsUpsertRequest(
+            results=[
+                MatchResultInput(participant_id=b_lookup["D"], rank=1, score=8),
+                MatchResultInput(participant_id=b_lookup["E"], rank=2, score=12),
+                MatchResultInput(participant_id=b_lookup["F"], rank=3, score=14),
+            ]
+        ),
+    )
+
+    refreshed = get_tournament_by_identifier(
+        db_session, tournament.id, public_only=False
+    )
+    assert refreshed is not None
+    round_three = generate_next_round(db_session, refreshed)
+    assert round_three.number == 3
+    assert round_three.is_final
+
+    match_a, match_b = sorted(round_three.matches, key=lambda item: item.sequence)
+    a_lookup = {
+        slot.participant.display_name: slot.participant_id
+        for slot in match_a.participants
+    }
+    b_lookup = {
+        slot.participant.display_name: slot.participant_id
+        for slot in match_b.participants
+    }
+    upsert_match_results(
+        db_session,
+        match_a,
+        MatchResultsUpsertRequest(
+            results=[
+                MatchResultInput(participant_id=a_lookup["A"], rank=1, score=9),
+                MatchResultInput(participant_id=a_lookup["B"], rank=2, score=13),
+                MatchResultInput(participant_id=a_lookup["C"], rank=3, score=15),
+            ]
+        ),
+    )
+    upsert_match_results(
+        db_session,
+        match_b,
+        MatchResultsUpsertRequest(
+            results=[
+                MatchResultInput(participant_id=b_lookup["D"], rank=1, score=7),
+                MatchResultInput(participant_id=b_lookup["E"], rank=2, score=11),
+                MatchResultInput(participant_id=b_lookup["F"], rank=3, score=16),
+            ]
+        ),
+    )
+
+    completed = get_tournament_by_identifier(
+        db_session, tournament.id, public_only=False
+    )
+    assert completed is not None
+    standings = calculate_standings(completed)
+    placements = {
+        entry["display_name"]: entry["final_placement"] for entry in standings
+    }
+    totals = {entry["display_name"]: entry["score_total"] for entry in standings}
+    assert [placements[name] for name in ["D", "A", "B", "E", "C", "F"]] == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+    ]
+    assert totals == {
+        "D": 24,
+        "A": 30,
+        "B": 35,
+        "E": 36,
+        "C": 45,
+        "F": 48,
+    }
 
 
 def test_round_robin_completes_full_schedule_and_uses_table_for_final_places(

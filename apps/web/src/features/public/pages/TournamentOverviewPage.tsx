@@ -9,7 +9,7 @@ import { PageShell } from "../../../components/PageShell";
 import { PublicTournamentTabs } from "../../../components/PublicTournamentTabs";
 import { StatusPill } from "../../../components/StatusPill";
 import { TournamentHighlights } from "../../../components/TournamentHighlights";
-import { advancementSummary, finalRoundLabel, tieBreakLabel } from "../../tournaments/formatMeta";
+import { advancementSummary, finalRoundLabel, leaderboardMetricLabel, scoreDirectionLabel, tieBreakLabel } from "../../tournaments/formatMeta";
 
 export function TournamentOverviewPage() {
   const { slug } = useParams();
@@ -81,13 +81,21 @@ export function TournamentOverviewPage() {
                     <span>{primaryStage?.match_size ?? "-"}</span>
                   </div>
                   <div className="mini-card format-metric-card">
-                    <strong>Tie-break lead</strong>
-                    <span>{tieBreakLabel(primaryStage?.tie_break_rules?.[0])}</span>
+                    <strong>Leaderboard</strong>
+                    <span>{leaderboardMetricLabel(primaryStage?.leaderboard_metric)}</span>
+                  </div>
+                  <div className="mini-card format-metric-card">
+                    <strong>{primaryStage?.score_label ?? "Score"}</strong>
+                    <span>{scoreDirectionLabel(primaryStage?.score_direction)}</span>
                   </div>
                 </div>
                 <div className="mini-card note-card">
                   <strong>Advancement story</strong>
                   <p>{advancementSummary(primaryStage?.advancement_summary, "No advancement rule configured yet.")}</p>
+                </div>
+                <div className="mini-card note-card">
+                  <strong>Tie-break lead</strong>
+                  <p>{tieBreakLabel(primaryStage?.tie_break_rules?.[0])}</p>
                 </div>
               </article>
 

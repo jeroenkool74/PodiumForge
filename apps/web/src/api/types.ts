@@ -86,6 +86,8 @@ export interface MatchRecord {
   round_name: string;
   is_bye: boolean;
   results_locked: boolean;
+  score_label: string;
+  score_direction: string;
   entrants: MatchEntrant[];
 }
 
@@ -106,8 +108,12 @@ export interface StageRecord {
   match_size: number | null;
   advancement_kind: string | null;
   advance_count: number | null;
+  round_count: number | null;
   points_scheme: PlacementPoint[];
   tie_break_rules: string[];
+  leaderboard_metric: string;
+  score_direction: string;
+  score_label: string;
   rounds: RoundRecord[];
   advancement_summary: string | null;
 }
@@ -116,6 +122,7 @@ export interface StandingEntry {
   participant_id: string;
   display_name: string;
   total_points: number;
+  score_total: number;
   matches_played: number;
   best_rank: number | null;
   average_rank: number | null;
@@ -192,6 +199,10 @@ export interface TournamentCreatePayload {
   directory_team_ids?: string[];
   points_scheme: PlacementPoint[];
   advance_count?: number;
+  round_count?: number;
+  leaderboard_metric: string;
+  score_direction: string;
+  score_label: string;
   is_public: boolean;
 }
 
@@ -233,7 +244,11 @@ export interface TournamentConfigExport {
   participant_type: string;
   match_size: number;
   advance_count?: number | null;
+  round_count?: number | null;
   is_public: boolean;
+  leaderboard_metric: string;
+  score_direction: string;
+  score_label: string;
   points_scheme: PlacementPoint[];
   tie_break_rules: TieBreakRuleRecord[];
   participants: TournamentConfigParticipant[];

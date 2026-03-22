@@ -16,12 +16,14 @@ FIXED_HEAD_TO_HEAD_MATCH_FORMATS = {
 }
 
 TABLE_STANDINGS_FORMATS = {
+    TournamentFormat.LEADERBOARD_SERIES.value,
     TournamentFormat.ROUND_ROBIN.value,
     TournamentFormat.SWISS.value,
 }
 
 AUTO_ADVANCEMENT_FORMATS = {
     TournamentFormat.STANDALONE_MATCH.value,
+    TournamentFormat.LEADERBOARD_SERIES.value,
     TournamentFormat.ROUND_ROBIN.value,
     TournamentFormat.SWISS.value,
     TournamentFormat.PAGE_PLAYOFF.value,

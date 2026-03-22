@@ -11,12 +11,23 @@ class RoleName(str, Enum):
 class TournamentFormat(str, Enum):
     FFA_ELIMINATION = "FFA_ELIMINATION"
     GROUP_POINTS = "GROUP_POINTS"
+    LEADERBOARD_SERIES = "LEADERBOARD_SERIES"
     ROUND_ROBIN = "ROUND_ROBIN"
     SWISS = "SWISS"
     PAGE_PLAYOFF = "PAGE_PLAYOFF"
     STANDALONE_MATCH = "STANDALONE_MATCH"
     BRACKET = "BRACKET"
     DOUBLE_ELIMINATION = "DOUBLE_ELIMINATION"
+
+
+class LeaderboardMetric(str, Enum):
+    POINTS = "POINTS"
+    SCORE = "SCORE"
+
+
+class ScoreDirection(str, Enum):
+    HIGHER_IS_BETTER = "HIGHER_IS_BETTER"
+    LOWER_IS_BETTER = "LOWER_IS_BETTER"
 
 
 class TournamentParticipantType(str, Enum):

@@ -1,12 +1,16 @@
 import { estimateRoundCount, getTournamentFormatGuide, nextPowerOfTwo, placementPreviewLabel, sortPointsScheme } from "../features/tournaments/formatGuides";
 import type { PlacementPoint } from "../api/types";
-import { usesFixedHeadToHeadMatches } from "../features/tournaments/formatMeta";
+import { leaderboardMetricLabel, scoreDirectionLabel, usesFixedHeadToHeadMatches } from "../features/tournaments/formatMeta";
 
 interface TournamentFormatInsightProps {
   format: string;
   participantCount: number;
   matchSize: number | null;
   advanceCount: number | null;
+  roundCount?: number | null;
+  leaderboardMetric?: string;
+  scoreDirection?: string;
+  scoreLabel?: string;
   pointsScheme?: PlacementPoint[];
   heading?: string;
 }
@@ -14,6 +18,7 @@ interface TournamentFormatInsightProps {
 function advanceSummary(format: string, advanceCount: number | null) {
   if (format === "STANDALONE_MATCH") return "No next round needed";
   if (format === "ROUND_ROBIN") return "Full schedule decides the table";
+  if (format === "LEADERBOARD_SERIES") return "Fixed round count decides the table";
   if (format === "SWISS") return "Fixed score-based pairings";
   if (format === "PAGE_PLAYOFF") return "Seeds 1 and 2 get a second chance";
   if (format === "BRACKET") return "One winner per match";
@@ -27,6 +32,7 @@ function structureSummary(
   participantCount: number,
   matchSize: number | null,
   advanceCount: number | null,
+  roundCount: number | null | undefined,
 ) {
   if (!participantCount) {
     return "Add entrants to preview how this setup will unfold in round one.";
@@ -40,6 +46,12 @@ function structureSummary(
     const rounds = participantCount % 2 === 0 ? participantCount - 1 : participantCount;
     const matchesPerRound = Math.floor(participantCount / 2);
     return `${participantCount} entrants create a ${rounds}-round league schedule with about ${matchesPerRound} simultaneous matches each round.`;
+  }
+
+  if (format === "LEADERBOARD_SERIES") {
+    const rounds = Math.max(1, roundCount ?? 1);
+    const openingMatches = Math.ceil(participantCount / Math.max(2, matchSize ?? 2));
+    return `${participantCount} entrants stay alive for ${rounds} scheduled ${rounds === 1 ? "round" : "rounds"}, with about ${openingMatches} grouped ${openingMatches === 1 ? "match" : "matches"} each round.`;
   }
 
   if (format === "SWISS") {
@@ -79,13 +91,17 @@ export function TournamentFormatInsight({
   participantCount,
   matchSize,
   advanceCount,
+  roundCount,
+  leaderboardMetric = "POINTS",
+  scoreDirection = "HIGHER_IS_BETTER",
+  scoreLabel = "Score",
   pointsScheme = [],
   heading = "Format guide",
 }: TournamentFormatInsightProps) {
   const guide = getTournamentFormatGuide(format);
   const sortedPoints = sortPointsScheme(pointsScheme);
-  const roundEstimate = estimateRoundCount(format, participantCount, matchSize ?? 2, advanceCount);
-  const setupSummary = structureSummary(format, participantCount, matchSize, advanceCount);
+  const roundEstimate = estimateRoundCount(format, participantCount, matchSize ?? 2, advanceCount, roundCount);
+  const setupSummary = structureSummary(format, participantCount, matchSize, advanceCount, roundCount);
 
   return (
     <section className="card format-insight-card">
@@ -116,6 +132,14 @@ export function TournamentFormatInsight({
             <div className="mini-card format-metric-card">
               <strong>Expected rounds</strong>
               <span>{roundEstimate || "-"}</span>
+            </div>
+            <div className="mini-card format-metric-card">
+              <strong>Leaderboard</strong>
+              <span>{leaderboardMetricLabel(leaderboardMetric)}</span>
+            </div>
+            <div className="mini-card format-metric-card">
+              <strong>{scoreLabel}</strong>
+              <span>{scoreDirectionLabel(scoreDirection)}</span>
             </div>
           </div>
 

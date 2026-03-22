@@ -1,5 +1,5 @@
 import type { StandingEntry } from "../api/types";
-import { tieBreakLabel } from "../features/tournaments/formatMeta";
+import { leaderboardMetricLabel, scoreDirectionLabel, tieBreakLabel } from "../features/tournaments/formatMeta";
 import { hasLiveStandings, standingPositionLabel } from "../features/tournaments/standingPresentation";
 import { StatusPill } from "./StatusPill";
 
@@ -26,6 +26,11 @@ function standingsStoryLabel(standingsCutoff: number | null) {
   return standingsCutoff !== null ? "Live qualification view" : "Progression and ranking rules";
 }
 
+function formatScoreTotal(value: number) {
+  if (Number.isInteger(value)) return `${value}`;
+  return value.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+}
+
 interface StandingsTableProps {
   entries: StandingEntry[];
   tournamentStatus?: string;
@@ -33,6 +38,9 @@ interface StandingsTableProps {
   advanceCount?: number | null;
   advancementSummary?: string | null;
   tieBreakRules?: string[];
+  leaderboardMetric?: string;
+  scoreDirection?: string;
+  scoreLabel?: string;
 }
 
 export function StandingsTable({
@@ -42,8 +50,12 @@ export function StandingsTable({
   advanceCount,
   advancementSummary,
   tieBreakRules = [],
+  leaderboardMetric = "POINTS",
+  scoreDirection = "HIGHER_IS_BETTER",
+  scoreLabel = "Score",
 }: StandingsTableProps) {
   const liveMode = tournamentStatus === "COMPLETED" ? false : hasLiveStandings(entries);
+  const showScoreColumn = leaderboardMetric === "SCORE" || entries.some((entry) => entry.score_total !== 0);
   const standingsCutoff = liveMode && advancementKind === "STANDINGS_TOP_N" && advanceCount && advanceCount > 0
     ? Math.min(advanceCount, entries.length)
     : null;
@@ -108,6 +120,14 @@ export function StandingsTable({
               <p className="muted-text">{tieBreakRules.map((rule) => tieBreakLabel(rule)).join(" -> ")}</p>
             </article>
           ) : null}
+
+          {showScoreColumn ? (
+            <article className="mini-card standings-note-card">
+              <span className="eyebrow">Leaderboard basis</span>
+              <strong>{leaderboardMetricLabel(leaderboardMetric)}</strong>
+              <p className="muted-text">{scoreLabel}: {scoreDirectionLabel(scoreDirection)}</p>
+            </article>
+          ) : null}
         </div>
       ) : null}
 
@@ -118,6 +138,7 @@ export function StandingsTable({
               <th>{liveMode ? "Rank now" : "Place"}</th>
               <th>Entrant</th>
               <th>Points</th>
+              {showScoreColumn ? <th>{scoreLabel}</th> : null}
               <th>Matches</th>
               <th>Best</th>
               <th>Avg.</th>
@@ -144,6 +165,7 @@ export function StandingsTable({
                     {liveMode && liveNote ? <div className="table-row-note">{liveNote}</div> : null}
                   </td>
                   <td>{entry.total_points}</td>
+                  {showScoreColumn ? <td>{formatScoreTotal(entry.score_total)}</td> : null}
                   <td>{entry.matches_played}</td>
                   <td>{entry.best_rank ?? "-"}</td>
                   <td>{entry.average_rank ?? "-"}</td>

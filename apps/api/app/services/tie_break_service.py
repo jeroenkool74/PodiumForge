@@ -4,8 +4,9 @@ from uuid import uuid4
 
 RULE_TYPE_LABELS = {
     "HEAD_TO_HEAD": "Head-to-head",
+    "TOTAL_POINTS": "Total points",
     "BEST_RANK": "Best rank",
-    "POINTS_DIFFERENTIAL": "Points differential",
+    "SCORE_TOTAL": "Score total",
     "MATCHES_PLAYED": "Matches played",
     "AVERAGE_RANK": "Average rank",
     "DISPLAY_NAME": "Display name",
@@ -13,8 +14,10 @@ RULE_TYPE_LABELS = {
 
 RULE_TYPE_ALIASES = {
     "head_to_head": "HEAD_TO_HEAD",
+    "total_points": "TOTAL_POINTS",
     "best_rank": "BEST_RANK",
-    "points_differential": "POINTS_DIFFERENTIAL",
+    "score_total": "SCORE_TOTAL",
+    "points_differential": "SCORE_TOTAL",
     "matches_played": "MATCHES_PLAYED",
     "average_rank": "AVERAGE_RANK",
     "display_name": "DISPLAY_NAME",
@@ -29,8 +32,9 @@ CLIENT_RULE_TYPE_MAP = {
     if key
     in {
         "head_to_head",
+        "total_points",
         "best_rank",
-        "points_differential",
+        "score_total",
         "matches_played",
         "average_rank",
         "display_name",

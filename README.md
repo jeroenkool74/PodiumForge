@@ -7,6 +7,7 @@ It is built for events where a match can have 3, 4, 5, or more entrants and prod
 ## What works now
 
 - Multiplayer matches are first-class: a match supports multiple entrants, ranked finishing order, points, scores, and tie-group input.
+- Scoring controls are configurable: tournaments can label the score field, choose whether higher or lower values are better, and run leaderboards by points or cumulative score where it fits.
 - Public pages are available without login: home, tournament overview, rounds, standings, round detail, match detail, dashboard, and TV mode.
 - Protected admin/editor pages support login, user management, tournament creation, tournament editing, live result entry, and next-round generation.
 - The ranking engine updates standings, qualification, elimination, provisional classification places, and final overall placements.
@@ -22,6 +23,8 @@ It is built for events where a match can have 3, 4, 5, or more entrants and prod
   - multiplayer heats where top finishers advance per match
 - `GROUP_POINTS`
   - shared leaderboard progression across groups or heats
+- `LEADERBOARD_SERIES`
+  - fixed number of grouped rounds feeding one cumulative leaderboard
 - `STANDALONE_MATCH`
   - one ranked match that locks the full final order immediately
 - `BRACKET`

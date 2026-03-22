@@ -29,6 +29,10 @@ interface TournamentCreateFormState {
   participant_type: "PLAYER" | "TEAM";
   match_size: number;
   advance_count: number;
+  round_count: number;
+  leaderboard_metric: "POINTS" | "SCORE";
+  score_direction: "HIGHER_IS_BETTER" | "LOWER_IS_BETTER";
+  score_label: string;
   participants: string;
   selected_directory_ids: string[];
   points: string;
@@ -59,6 +63,10 @@ const initialForm: TournamentCreateFormState = {
   participant_type: "PLAYER",
   match_size: 5,
   advance_count: 2,
+  round_count: 3,
+  leaderboard_metric: "POINTS",
+  score_direction: "HIGHER_IS_BETTER",
+  score_label: "Score",
   participants: "",
   selected_directory_ids: [],
   points: getTournamentSetupConfig("FFA_ELIMINATION").defaultPointsScheme,
@@ -93,13 +101,14 @@ export function TournamentCreatePage() {
   const currentSetup = getTournamentSetupConfig(form.format);
   const fixedHeadToHeadFormat = usesFixedHeadToHeadMatches(form.format);
   const optionalPointsFormat = currentSetup.pointsOptional;
+  const runningLeaderboardFormat = form.format === "GROUP_POINTS" || form.format === "LEADERBOARD_SERIES";
   const selectedAdvanceCount = currentSetup.advanceCountMode === "hidden"
     ? null
     : currentSetup.advanceCountMode === "fixed-one"
       ? 1
       : form.advance_count;
   const selectedMatchSize = fixedHeadToHeadFormat ? 2 : form.match_size;
-  const pointsRequired = !optionalPointsFormat;
+  const pointsRequired = !optionalPointsFormat && !(runningLeaderboardFormat && form.leaderboard_metric === "SCORE");
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
   useUnsavedChangesWarning(isDirty && !submitting, "You have unsaved tournament setup changes. Leave this page anyway?");
@@ -122,6 +131,7 @@ export function TournamentCreatePage() {
             : nextFormatSetup.advanceCountMode === "fixed-one"
               ? 1
               : 2,
+        round_count: nextFormat === "LEADERBOARD_SERIES" ? current.round_count || 3 : current.round_count,
         points: pointsWereDefault ? nextFormatSetup.defaultPointsScheme : current.points,
       };
     });
@@ -182,6 +192,10 @@ export function TournamentCreatePage() {
       setError("Advance count is required for this format.");
       return;
     }
+    if (form.format === "LEADERBOARD_SERIES" && (!Number.isInteger(form.round_count) || form.round_count < 1)) {
+      setError("Scheduled rounds must be at least 1.");
+      return;
+    }
     if (
       form.format === "FFA_ELIMINATION" &&
       effectiveAdvanceCount != null &&
@@ -205,6 +219,10 @@ export function TournamentCreatePage() {
         directory_team_ids: form.participant_type === "TEAM" ? form.selected_directory_ids : [],
         points_scheme: parsedPoints,
         advance_count: effectiveAdvanceCount,
+        round_count: form.format === "LEADERBOARD_SERIES" ? form.round_count : undefined,
+        leaderboard_metric: form.leaderboard_metric,
+        score_direction: form.score_direction,
+        score_label: form.score_label.trim() || "Score",
         is_public: form.is_public,
       });
       navigate(`/admin/tournaments/${created.id}`);
@@ -260,7 +278,7 @@ export function TournamentCreatePage() {
 
       <TournamentSchemeLibrary
         title="Supported now and next"
-        subtitle="Round-robin leagues, Swiss tournaments, and Page playoffs now join the supported setup options, while ladder play and McMahon remain visible on the roadmap."
+        subtitle="Leaderboard series, round-robin leagues, Swiss tournaments, and Page playoffs now sit beside the original elimination flows, while ladder play and McMahon remain visible on the roadmap."
       />
 
       <TournamentFormatInsight
@@ -268,6 +286,10 @@ export function TournamentCreatePage() {
         participantCount={participantNames.length}
         matchSize={selectedMatchSize}
         advanceCount={selectedAdvanceCount}
+        roundCount={form.format === "LEADERBOARD_SERIES" ? form.round_count : null}
+        leaderboardMetric={form.leaderboard_metric}
+        scoreDirection={form.score_direction}
+        scoreLabel={form.score_label}
         pointsScheme={parsedPoints}
         heading="Selected flow"
       />
@@ -326,6 +348,47 @@ export function TournamentCreatePage() {
                 onChange={(event) => setForm((current) => ({ ...current, advance_count: Number(event.target.value) }))}
               />
               <span className="field-hint">{advanceCountHint(form.format)}</span>
+            </label>
+
+            {form.format === "LEADERBOARD_SERIES" ? (
+              <label>
+                <span>Scheduled rounds</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={64}
+                  required
+                  value={form.round_count}
+                  onChange={(event) => setForm((current) => ({ ...current, round_count: Number(event.target.value) }))}
+                />
+                <span className="field-hint">Everyone stays active until this fixed number of rounds is complete.</span>
+              </label>
+            ) : null}
+
+            {runningLeaderboardFormat ? (
+              <label>
+                <span>Leaderboard basis</span>
+                <select value={form.leaderboard_metric} onChange={(event) => setForm((current) => ({ ...current, leaderboard_metric: event.target.value as "POINTS" | "SCORE" }))}>
+                  <option value="POINTS">Total points</option>
+                  <option value="SCORE">Total score</option>
+                </select>
+                <span className="field-hint">Choose whether the running table follows awarded points or the sum of the score field.</span>
+              </label>
+            ) : null}
+
+            <label>
+              <span>Score direction</span>
+              <select value={form.score_direction} onChange={(event) => setForm((current) => ({ ...current, score_direction: event.target.value as "HIGHER_IS_BETTER" | "LOWER_IS_BETTER" }))}>
+                <option value="HIGHER_IS_BETTER">Higher is better</option>
+                <option value="LOWER_IS_BETTER">Lower is better</option>
+              </select>
+              <span className="field-hint">Controls how score values break ties and how score-based leaderboards rank entrants.</span>
+            </label>
+
+            <label>
+              <span>Score label</span>
+              <input value={form.score_label} maxLength={40} onChange={(event) => setForm((current) => ({ ...current, score_label: event.target.value }))} />
+              <span className="field-hint">Rename the numeric match field for your event, such as Score, Time, or Differential.</span>
             </label>
           </div>
 

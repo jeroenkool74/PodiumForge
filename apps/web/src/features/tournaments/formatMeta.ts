@@ -26,6 +26,12 @@ export const tournamentSetupConfig: Record<TournamentFormat, TournamentSetupConf
     advanceCountMode: "manual",
     pointsOptional: false,
   },
+  LEADERBOARD_SERIES: {
+    defaultPointsScheme: "1:10, 2:7, 3:5, 4:3, 5:1",
+    fixedHeadToHeadMatchSize: false,
+    advanceCountMode: "hidden",
+    pointsOptional: true,
+  },
   ROUND_ROBIN: {
     defaultPointsScheme: "1:3, 2:0",
     fixedHeadToHeadMatchSize: true,
@@ -96,6 +102,8 @@ export function finalRoundLabel(format: string | undefined, fallback = "Final pl
       return "Championship round";
     case "ROUND_ROBIN":
       return "Final league round";
+    case "LEADERBOARD_SERIES":
+      return "Final scheduled round";
     case "SWISS":
       return "Final Swiss round";
     case "PAGE_PLAYOFF":
@@ -107,8 +115,11 @@ export function finalRoundLabel(format: string | undefined, fallback = "Final pl
 
 export function tieBreakLabel(rule: string | undefined, fallback = "Default order") {
   switch (rule) {
+    case "TOTAL_POINTS":
     case "TOTAL_POINTS_DESC":
       return "Most total points";
+    case "SCORE_TOTAL":
+      return "Best score total";
     case "BEST_RANK_ASC":
       return "Best single finish";
     case "AVERAGE_RANK_ASC":
@@ -130,6 +141,8 @@ export function activeFieldHeading(format: string | undefined) {
       return "Still alive across both brackets";
     case "GROUP_POINTS":
       return "Still in contention";
+    case "LEADERBOARD_SERIES":
+      return "Full leaderboard field";
     case "ROUND_ROBIN":
       return "League field";
     case "SWISS":
@@ -151,6 +164,8 @@ export function dashboardSubtitle(format: string | undefined) {
       return "Upper bracket, lower bracket, and grand-final pressure in one live view.";
     case "GROUP_POINTS":
       return "Leaderboard movement, active tables, and qualification watch.";
+    case "LEADERBOARD_SERIES":
+      return "Running leaderboard totals, active groups, and every round still in play.";
     case "ROUND_ROBIN":
       return "League table movement, current fixtures, and title-race updates.";
     case "SWISS":
@@ -175,6 +190,8 @@ export function tournamentPulse(format: string | undefined, status: string | und
       return "Watch contenders fall into the lower bracket, fight back, and try to reach the grand final from the long road.";
     case "GROUP_POINTS":
       return "Points from every table feed the live leaderboard, so every result can move the cut line.";
+    case "LEADERBOARD_SERIES":
+      return "Every scheduled round feeds the same leaderboard, so the final order keeps moving until the last result lands.";
     case "ROUND_ROBIN":
       return "Every round updates one shared league table, so the title race stays visible from the first fixture to the last.";
     case "SWISS":
@@ -229,9 +246,33 @@ export function advanceCountHint(format: TournamentFormat) {
     case "DOUBLE_ELIMINATION":
       return "Winners stay in the upper bracket, while first-time losers move into the lower bracket.";
     case "GROUP_POINTS":
-      return "This is how many entrants survive based on the shared points leaderboard.";
+      return "This is how many entrants survive based on the shared leaderboard.";
+    case "LEADERBOARD_SERIES":
+      return "A leaderboard series keeps the full field active for a fixed number of scheduled rounds.";
     default:
       return "This is how many finishers survive from each individual match.";
+  }
+}
+
+export function scoreDirectionLabel(value: string | undefined, fallback = "Higher is better") {
+  switch (value) {
+    case "LOWER_IS_BETTER":
+      return "Lower is better";
+    case "HIGHER_IS_BETTER":
+      return "Higher is better";
+    default:
+      return fallback;
+  }
+}
+
+export function leaderboardMetricLabel(value: string | undefined, fallback = "Points") {
+  switch (value) {
+    case "SCORE":
+      return "Score";
+    case "POINTS":
+      return "Points";
+    default:
+      return fallback;
   }
 }
 
