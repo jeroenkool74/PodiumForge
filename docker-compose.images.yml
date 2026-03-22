@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: podiumforge
+      POSTGRES_USER: podiumforge
+      POSTGRES_PASSWORD: podiumforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U podiumforge -d podiumforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.24
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  api:
+    image: ${PODIUMFORGE_API_IMAGE:-ghcr.io/your-org/podiumforge-api:latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://podiumforge:podiumforge@db:5432/podiumforge
+      JWT_SECRET_KEY: podiumforge-change-me
+      CORS_ORIGINS: '["http://localhost:8080"]'
+      SEEDED_ADMIN_EMAIL: admin@podiumforge.local
+      SEEDED_ADMIN_PASSWORD: admin1234
+      SEEDED_ADMIN_USERNAME: admin
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM_EMAIL: no-reply@podiumforge.local
+      SMTP_FROM_NAME: PodiumForge
+      PASSWORD_RESET_URL_BASE: http://localhost:8080/reset-password
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    ports:
+      - "8000:8000"
+
+  web:
+    image: ${PODIUMFORGE_WEB_IMAGE:-ghcr.io/your-org/podiumforge-web:latest}
+    restart: unless-stopped
+    environment:
+      PODIUMFORGE_API_UPSTREAM: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres-data:

@@ -73,6 +73,7 @@ Roadmapped but not yet implemented as engines:
 |- packages/
 |  |- shared/
 |- docker-compose.yml
+|- docker-compose.images.yml
 ```
 
 ## Quick start
@@ -88,6 +89,36 @@ Then open:
 - Mailpit: `http://localhost:8025`
 
 On first startup the API runs Alembic migrations, ensures roles exist, and creates the configured admin account if needed.
+
+## Published images
+
+The repository now includes a GitHub Actions workflow at `.github/workflows/publish-docker-images.yml` that publishes two multi-arch GHCR images:
+
+- `ghcr.io/<owner>/podiumforge-api`
+- `ghcr.io/<owner>/podiumforge-web`
+
+The release images are built from:
+
+- `apps/api/Dockerfile.release`
+- `apps/web/Dockerfile.release`
+
+They are trimmed for smaller download size by keeping the frontend runtime to static assets + Nginx and the backend runtime to an Alpine Python image with production-only dependencies.
+
+If you want the published packages to be publicly pullable from GHCR, make sure the package visibility is set to `public` after the first publish.
+
+Example usage with the published images:
+
+```bash
+docker compose -f docker-compose.images.yml up -d
+```
+
+Override the default example image names if needed:
+
+```bash
+PODIUMFORGE_API_IMAGE=ghcr.io/<owner>/podiumforge-api:latest \
+PODIUMFORGE_WEB_IMAGE=ghcr.io/<owner>/podiumforge-web:latest \
+docker compose -f docker-compose.images.yml up -d
+```
 
 ## Default login
 

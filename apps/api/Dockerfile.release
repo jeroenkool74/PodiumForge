@@ -1,0 +1,42 @@
+FROM python:3.12-alpine AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /src
+
+COPY requirements.prod.txt /tmp/requirements.txt
+RUN python -m venv "$VIRTUAL_ENV" \
+    && pip install --no-compile -r /tmp/requirements.txt \
+    && rm -rf /opt/venv/bin/pip* /opt/venv/lib/python3.12/site-packages/pip*
+
+COPY alembic.ini /src/alembic.ini
+COPY alembic /src/alembic
+COPY app /src/app
+
+FROM python:3.12-alpine AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+RUN addgroup -S podiumforge && adduser -S -G podiumforge podiumforge
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /src/alembic.ini /app/alembic.ini
+COPY --from=builder /src/alembic /app/alembic
+COPY --from=builder /src/app /app/app
+
+RUN chown -R podiumforge:podiumforge /app
+
+USER podiumforge
+
+EXPOSE 8000
+
+CMD ["python", "-m", "app.start"]
