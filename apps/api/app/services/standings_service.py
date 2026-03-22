@@ -21,6 +21,7 @@ from app.services.tie_break_service import (
     normalize_tie_break_rules,
     tie_break_rule_labels,
 )
+from app.services.tournament_builder import can_add_participants
 
 
 def sorted_rounds(tournament: Tournament) -> list[Round]:
@@ -540,7 +541,7 @@ def calculate_standings(tournament: Tournament) -> list[dict]:
         entry["current_status"] = status
         entry["final_placement"] = provisional_placements.get(entry["participant_id"])
 
-    ordered = calculate_leaderboard(tournament)
+    ordered = _sorted_with_tie_breaks(entries, tournament)
     if alive_ids:
         alive_entries = [
             entry for entry in ordered if entry["participant_id"] in alive_ids
@@ -777,6 +778,7 @@ def serialize_tournament_detail(tournament: Tournament) -> dict:
         "standings": standings,
         "qualified": sorted(qualified_names),
         "eliminated": sorted(eliminated_names),
+        "can_add_participants": can_add_participants(tournament),
         "can_generate_next_round": can_generate_next_round(tournament),
     }
 

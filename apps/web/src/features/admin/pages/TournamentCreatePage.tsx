@@ -5,7 +5,6 @@ import { api } from "../../../api/client";
 import { useApiResource } from "../../../app/useApiResource";
 import { useUnsavedChangesWarning } from "../../../app/useUnsavedChangesWarning";
 import { PageShell } from "../../../components/PageShell";
-import { TournamentSchemeLibrary } from "../../../components/TournamentSchemeLibrary";
 import { TournamentFormatInsight } from "../../../components/TournamentFormatInsight";
 import { useAuth } from "../../auth/AuthContext";
 import {
@@ -81,7 +80,6 @@ export function TournamentCreatePage() {
   const [form, setForm] = useState<TournamentCreateFormState>(initialForm);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [importing, setImporting] = useState(false);
 
   const participantNames = useMemo(
     () => form.participants.split("\n").map((value) => value.trim()).filter(Boolean),
@@ -135,21 +133,6 @@ export function TournamentCreatePage() {
         points: pointsWereDefault ? nextFormatSetup.defaultPointsScheme : current.points,
       };
     });
-  }
-
-  async function handleImportConfig(file: File) {
-    if (importing) return;
-    setImporting(true);
-    setError(null);
-    try {
-      const parsed = JSON.parse(await file.text()) as Parameters<typeof api.importTournamentConfig>[1];
-      const imported = await api.importTournamentConfig(token ?? "", parsed);
-      navigate(`/admin/tournaments/${imported.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to import tournament config");
-    } finally {
-      setImporting(false);
-    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -237,7 +220,7 @@ export function TournamentCreatePage() {
     <PageShell
       mode="admin"
       title="Create tournament"
-      subtitle="Pick the competition flow first, then tune the details with live explanations before round one is generated."
+      subtitle="Pick the competition flow first, then tune the details before round one is generated."
     >
       <section className="card content-stack">
         <div className="section-heading">
@@ -276,11 +259,6 @@ export function TournamentCreatePage() {
         </div>
       </section>
 
-      <TournamentSchemeLibrary
-        title="Supported now and next"
-        subtitle="Leaderboard series, round-robin leagues, Swiss tournaments, and Page playoffs now sit beside the original elimination flows, while ladder play and McMahon remain visible on the roadmap."
-      />
-
       <TournamentFormatInsight
         format={form.format}
         participantCount={participantNames.length}
@@ -292,6 +270,7 @@ export function TournamentCreatePage() {
         scoreLabel={form.score_label}
         pointsScheme={parsedPoints}
         heading="Selected flow"
+        collapsible
       />
 
       <section className="card">
@@ -476,26 +455,6 @@ export function TournamentCreatePage() {
         </form>
       </section>
 
-      <section className="card content-stack">
-        <div className="section-heading">
-          <div>
-            <h2>Import saved setup</h2>
-            <p className="muted-text">Bring in a reusable tournament template exported from another PodiumForge version.</p>
-          </div>
-        </div>
-        <label>
-          <span>Configuration JSON</span>
-          <input type="file" accept="application/json" onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) {
-              void handleImportConfig(file);
-              event.currentTarget.value = "";
-            }
-          }} />
-        </label>
-        <p className="muted-text">The imported file can include points, tie-breaks, participants, and saved team rosters.</p>
-        {importing ? <div className="chip-panel">Importing configuration...</div> : null}
-      </section>
     </PageShell>
   );
 }

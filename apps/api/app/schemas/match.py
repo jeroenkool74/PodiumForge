@@ -13,7 +13,3 @@ class MatchResultInput(BaseModel):
 
 class MatchResultsUpsertRequest(BaseModel):
     results: list[MatchResultInput] = Field(min_length=1, max_length=128)
-
-
-class MatchScheduleUpdateRequest(BaseModel):
-    scheduled_at: str | None = None

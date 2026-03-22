@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import type { MatchEntrant, MatchRecord, RoundRecord } from "../api/types";
 import { nextPowerOfTwo } from "../features/tournaments/formatGuides";
@@ -41,6 +41,11 @@ interface DisplayRound {
   isPlaceholder: boolean;
   isFinal: boolean;
   matches: DisplayMatch[];
+}
+
+interface BracketConnector {
+  key: string;
+  path: string;
 }
 
 function roundNameFromSize(matchCount: number, roundIndex: number, totalRounds: number) {
@@ -183,6 +188,85 @@ export function BracketBoard({
   matchHrefBuilder,
 }: BracketBoardProps) {
   const roundsForDisplay = displayRounds(rounds, participantCount, showFutureRounds, matchHrefBuilder);
+  const columnsRef = useRef<HTMLDivElement | null>(null);
+  const cardRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [connectors, setConnectors] = useState<BracketConnector[]>([]);
+
+  function cardKey(roundIndex: number, matchIndex: number) {
+    return `round-${roundIndex}-match-${matchIndex}`;
+  }
+
+  function registerCardRef(key: string) {
+    return (element: HTMLElement | null) => {
+      cardRefs.current[key] = element;
+    };
+  }
+
+  useEffect(() => {
+    function updateConnectors() {
+      const container = columnsRef.current;
+      if (!container) {
+        setConnectors([]);
+        return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const nextConnectors: BracketConnector[] = [];
+
+      roundsForDisplay.forEach((round, roundIndex) => {
+        const nextRound = roundsForDisplay[roundIndex + 1];
+        if (!nextRound) return;
+
+        round.matches.forEach((_, matchIndex) => {
+          const source = cardRefs.current[cardKey(roundIndex, matchIndex)];
+          const target = cardRefs.current[
+            cardKey(roundIndex + 1, Math.floor(matchIndex / 2))
+          ];
+          if (!source || !target) return;
+
+          const sourceRect = source.getBoundingClientRect();
+          const targetRect = target.getBoundingClientRect();
+          const startX = sourceRect.right - containerRect.left;
+          const startY = sourceRect.top - containerRect.top + sourceRect.height / 2;
+          const endX = targetRect.left - containerRect.left;
+          const endY = targetRect.top - containerRect.top + targetRect.height / 2;
+          const bendX = startX + (endX - startX) / 2;
+
+          nextConnectors.push({
+            key: `${round.key}-${nextRound.key}-${matchIndex}`,
+            path: `M ${startX} ${startY} H ${bendX} V ${endY} H ${endX}`,
+          });
+        });
+      });
+
+      setConnectors(nextConnectors);
+    }
+
+    const frame = requestAnimationFrame(updateConnectors);
+    const container = columnsRef.current;
+    if (!container) return () => cancelAnimationFrame(frame);
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateConnectors);
+      return () => {
+        cancelAnimationFrame(frame);
+        window.removeEventListener("resize", updateConnectors);
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(() => updateConnectors());
+    resizeObserver.observe(container);
+    Object.values(cardRefs.current).forEach((element) => {
+      if (element) resizeObserver.observe(element);
+    });
+    window.addEventListener("resize", updateConnectors);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateConnectors);
+    };
+  }, [roundsForDisplay]);
 
   return (
     <section className="card bracket-board-card">
@@ -195,7 +279,12 @@ export function BracketBoard({
       </div>
 
       <div className="bracket-scroll">
-        <div className="bracket-columns">
+        <div ref={columnsRef} className="bracket-columns">
+          <svg className="bracket-connector-layer" aria-hidden="true">
+            {connectors.map((connector) => (
+              <path key={connector.key} className="bracket-connector-path" d={connector.path} />
+            ))}
+          </svg>
           {roundsForDisplay.map((round, index) => (
             <section
               key={round.key}
@@ -209,7 +298,7 @@ export function BracketBoard({
               </header>
 
               <div className="bracket-match-stack">
-                {round.matches.map((match) => {
+                {round.matches.map((match, matchIndex) => {
                   const cardClassName = `bracket-match-card ${match.isPlaceholder ? "placeholder-match-card" : ""} ${match.isBye ? "bye-match-card" : ""} ${match.href ? "bracket-match-link-card" : ""}`;
                   const content = (
                     <>
@@ -245,11 +334,21 @@ export function BracketBoard({
                   );
 
                   return match.href ? (
-                    <Link key={match.key} to={match.href} className={cardClassName} aria-label={`Open ${match.name}`}>
+                    <Link
+                      key={match.key}
+                      ref={registerCardRef(cardKey(index, matchIndex))}
+                      to={match.href}
+                      className={cardClassName}
+                      aria-label={`Open ${match.name}`}
+                    >
                       {content}
                     </Link>
                   ) : (
-                    <article key={match.key} className={cardClassName}>
+                    <article
+                      key={match.key}
+                      ref={registerCardRef(cardKey(index, matchIndex))}
+                      className={cardClassName}
+                    >
                       {content}
                     </article>
                   );

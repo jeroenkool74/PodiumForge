@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { AdminHomePage } from "../features/admin/pages/AdminHomePage";
 import { LoginPage } from "../features/admin/pages/LoginPage";
@@ -20,6 +20,11 @@ import { RoundDetailPage } from "../features/public/pages/RoundDetailPage";
 import { StandingsPage } from "../features/public/pages/StandingsPage";
 import { TournamentOverviewPage } from "../features/public/pages/TournamentOverviewPage";
 
+function LegacyDashboardRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={slug ? `/tournaments/${slug}` : "/"} replace />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -31,7 +36,7 @@ export default function App() {
       <Route path="/tournaments/:slug/rounds/:roundId" element={<RoundDetailPage />} />
       <Route path="/matches/:matchId" element={<MatchDetailPage />} />
       <Route path="/dashboard/:slug/tv" element={<PublicDashboardPage immersive />} />
-      <Route path="/dashboard/:slug" element={<PublicDashboardPage />} />
+      <Route path="/dashboard/:slug" element={<LegacyDashboardRedirect />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/reset-password" element={<PasswordResetPage />} />
       <Route path="/admin" element={<ProtectedRoute roles={[ADMIN_ROLE, TOURNAMENT_EDITOR_ROLE]}><AdminHomePage /></ProtectedRoute>} />

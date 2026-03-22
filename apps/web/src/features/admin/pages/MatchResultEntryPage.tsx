@@ -79,8 +79,6 @@ export function MatchResultEntryPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState("");
-  const [scheduling, setScheduling] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
   const isBye = match.data?.is_bye ?? false;
@@ -112,16 +110,6 @@ export function MatchResultEntryPage() {
       }));
     setRows(initial);
   }, [match.data]);
-
-  useEffect(() => {
-    if (!match.data?.scheduled_at) {
-      setScheduledAt("");
-      return;
-    }
-    const date = new Date(match.data.scheduled_at);
-    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-    setScheduledAt(local.toISOString().slice(0, 16));
-  }, [match.data?.scheduled_at]);
 
   function moveRow(index: number, direction: -1 | 1) {
     setRows((current) => {
@@ -194,39 +182,6 @@ export function MatchResultEntryPage() {
     }
   }
 
-  async function handleScheduleSave() {
-    if (scheduling) return;
-    setScheduling(true);
-    setMessage(null);
-    setError(null);
-    try {
-      await api.scheduleMatch(token ?? "", matchId ?? "", scheduledAt ? new Date(scheduledAt).toISOString() : null);
-      setMessage(scheduledAt ? "Match schedule saved." : "Match schedule cleared.");
-      await match.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update the schedule");
-    } finally {
-      setScheduling(false);
-    }
-  }
-
-  async function handleScheduleClear() {
-    if (scheduling) return;
-    setScheduling(true);
-    setMessage(null);
-    setError(null);
-    try {
-      await api.scheduleMatch(token ?? "", matchId ?? "", null);
-      setScheduledAt("");
-      setMessage("Match schedule cleared.");
-      await match.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to clear the schedule");
-    } finally {
-      setScheduling(false);
-    }
-  }
-
   async function handleClearResults() {
     if (clearing) return;
     setClearing(true);
@@ -250,7 +205,7 @@ export function MatchResultEntryPage() {
       {match.error ? <div className="card error-card">{match.error}</div> : null}
       {match.data ? (
         <form className="card content-stack" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
-            <div className="card-header-row">
+          <div className="card-header-row">
               <div>
                 <h2>{match.data.name}</h2>
                 <p className="muted-text">Use the arrows for quick ordering, or type place numbers directly for ties. Shared places must also share one tie group. {scoreLabel} guidance: {scoreDirectionLabel}.</p>
@@ -258,17 +213,6 @@ export function MatchResultEntryPage() {
             <div className="button-row compact-row">
               <Link to={`/admin/tournaments/${match.data.tournament_id}`}>Back to tournament</Link>
               <Link to="/admin">Back to admin</Link>
-            </div>
-          </div>
-          <div className="chip-panel inline-form-panel">
-            <div>
-              <strong>Schedule</strong>
-              <p className="muted-text">Store the planned start time before results are entered.</p>
-            </div>
-            <div className="button-row compact-row">
-              <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
-              <button type="button" onClick={() => void handleScheduleSave()} disabled={scheduling}>{scheduling ? "Saving..." : "Save schedule"}</button>
-              {match.data.scheduled_at ? <button type="button" className="ghost-button" onClick={() => void handleScheduleClear()} disabled={scheduling}>Clear</button> : null}
             </div>
           </div>
           {isBye ? (

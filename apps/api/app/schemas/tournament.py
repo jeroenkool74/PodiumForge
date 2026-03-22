@@ -272,6 +272,7 @@ class TournamentDetailRead(BaseModel):
     standings: list[StandingEntryRead]
     qualified: list[str]
     eliminated: list[str]
+    can_add_participants: bool
     can_generate_next_round: bool
 
 
@@ -299,10 +300,6 @@ class AdminDashboardRead(BaseModel):
     completed_matches: int
 
 
-class MatchScheduleUpdateRequest(BaseModel):
-    scheduled_at: datetime | None = None
-
-
 class PointsSchemeUpdateRequest(BaseModel):
     points_scheme: list[PlacementPointsInput] = Field(default_factory=list)
 
@@ -328,45 +325,6 @@ class TieBreakRuleItemRead(BaseModel):
     name: str
     order_index: int
     config: dict
-
-
-class TournamentConfigParticipantInput(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
-    members: list[str] = Field(default_factory=list, max_length=64)
-
-
-class TournamentConfigExportRead(BaseModel):
-    name: str
-    description: str
-    format: str
-    participant_type: str
-    match_size: int
-    advance_count: int | None = None
-    round_count: int | None = None
-    is_public: bool
-    leaderboard_metric: str = LeaderboardMetric.POINTS.value
-    score_direction: str = ScoreDirection.HIGHER_IS_BETTER.value
-    score_label: str = DEFAULT_SCORE_LABEL
-    points_scheme: list[PlacementPointsInput] = Field(default_factory=list)
-    tie_break_rules: list[TieBreakRuleItemRead] = Field(default_factory=list)
-    participants: list[TournamentConfigParticipantInput] = Field(default_factory=list)
-
-
-class TournamentConfigImportRequest(BaseModel):
-    name: str = Field(min_length=3, max_length=255)
-    description: str = Field(default="", max_length=2000)
-    format: TournamentFormat
-    participant_type: TournamentParticipantType
-    match_size: int = Field(default=5, ge=2, le=64)
-    advance_count: int | None = Field(default=None, ge=1, le=64)
-    round_count: int | None = Field(default=None, ge=1, le=64)
-    is_public: bool = True
-    leaderboard_metric: LeaderboardMetric = Field(default=LeaderboardMetric.POINTS)
-    score_direction: ScoreDirection = Field(default=ScoreDirection.HIGHER_IS_BETTER)
-    score_label: str = Field(default=DEFAULT_SCORE_LABEL, max_length=40)
-    points_scheme: list[PlacementPointsInput] = Field(default_factory=list)
-    tie_break_rules: list[TieBreakRuleItemRead] = Field(default_factory=list)
-    participants: list[TournamentConfigParticipantInput] = Field(default_factory=list)
 
 
 class PublicTeamRead(BaseModel):

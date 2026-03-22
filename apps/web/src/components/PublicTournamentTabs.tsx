@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-type TournamentTab = "overview" | "rounds" | "standings" | "dashboard" | "teams";
+type TournamentTab = "overview" | "rounds" | "standings" | "teams";
 
 function tabClassName(current: TournamentTab, tab: TournamentTab) {
   return `tournament-tab-link ${current === tab ? "active-tournament-tab" : ""}`;
@@ -17,9 +17,6 @@ export function PublicTournamentTabs({ slug, current, showTeams = false }: { slu
       </Link>
       <Link className={tabClassName(current, "standings")} to={`/tournaments/${slug}/standings`}>
         Standings
-      </Link>
-      <Link className={tabClassName(current, "dashboard")} to={`/dashboard/${slug}`}>
-        Dashboard
       </Link>
       {showTeams ? (
         <Link className={tabClassName(current, "teams")} to={`/tournaments/${slug}/teams`}>

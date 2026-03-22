@@ -17,20 +17,13 @@ export function StandingsPage() {
       mode="public"
       title={detail.data ? `${detail.data.name} standings` : "Standings"}
       subtitle="Current rankings, points, and overall placement."
+      actions={detail.data ? <Link to={`/tournaments/${detail.data.slug}/print`}>Print view</Link> : undefined}
     >
       {detail.loading || standings.loading ? <div className="card">Loading standings...</div> : null}
       {detail.error || standings.error ? <div className="card error-card">{detail.error ?? standings.error}</div> : null}
-        {detail.data ? (
+      {detail.data ? (
         <>
           <PublicTournamentTabs slug={detail.data.slug} current="standings" showTeams={showTeams} />
-          <section className="card">
-            <div className="button-row compact-row">
-              <Link to={`/tournaments/${detail.data.slug}?tab=rounds`}>Rounds</Link>
-              <Link to={`/dashboard/${detail.data.slug}`}>Dashboard</Link>
-              {showTeams ? <Link to={`/tournaments/${detail.data.slug}/teams`}>Teams</Link> : null}
-              <Link to={`/tournaments/${detail.data.slug}/print`}>Print view</Link>
-            </div>
-          </section>
         </>
       ) : null}
       {standings.data ? (

@@ -3,7 +3,6 @@ import { getParticipantTypeLabel, getTournamentFormatLabel } from "@podiumforge/
 import { api } from "../../../api/client";
 import { PageShell } from "../../../components/PageShell";
 import { StatusPill } from "../../../components/StatusPill";
-import { TournamentSchemeLibrary } from "../../../components/TournamentSchemeLibrary";
 import { useApiResource } from "../../../app/useApiResource";
 
 export function HomePage() {
@@ -12,8 +11,8 @@ export function HomePage() {
   return (
     <PageShell
       mode="public"
-      title="Tournament dashboards"
-      subtitle="Open a tournament to view its overview, standings, rounds, matches, and live dashboard."
+      title="Tournaments"
+      subtitle="Open a tournament to view its overview, standings, rounds, matches, and TV mode."
     >
       <section className="content-stack">
         <div className="section-heading">
@@ -56,13 +55,11 @@ export function HomePage() {
               <div className="button-row">
                 <Link to={`/tournaments/${tournament.slug}`}>Overview</Link>
                 <Link to={`/tournaments/${tournament.slug}/standings`}>Standings</Link>
-                <Link to={`/dashboard/${tournament.slug}`}>Dashboard</Link>
+                <Link to={`/dashboard/${tournament.slug}/tv`}>TV mode</Link>
               </div>
             </article>
           ))}
         </div>
-
-        <TournamentSchemeLibrary />
       </section>
     </PageShell>
   );

@@ -61,6 +61,8 @@ button,
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  justify-self: start;
+  align-self: start;
   gap: 0.4rem;
   border: none;
   border-radius: 999px;
@@ -96,6 +98,11 @@ textarea {
   border: 1px solid var(--border);
   background: var(--surface-strong);
   padding: 0.85rem 1rem;
+}
+
+textarea {
+  resize: none;
+  align-self: start;
 }
 
 h1,
@@ -376,6 +383,39 @@ thead th {
   align-items: center;
 }
 
+.collapsible-card {
+  display: grid;
+  gap: 0;
+}
+
+.collapsible-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-summary-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.collapsible-summary-hint {
+  white-space: nowrap;
+}
+
+.collapsible-content {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
 .tournament-tab-link {
   display: inline-flex;
   align-items: center;
@@ -607,12 +647,12 @@ tbody tr.cut-line-row td {
 
 .leaderboard-row-card {
   display: grid;
-  grid-template-columns: minmax(90px, 0.45fr) minmax(140px, 1fr) auto;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto;
   align-items: center;
 }
 
 .dashboard-name-cloud {
-  grid-template-columns: repeat(auto-fit, minmax(110px, max-content));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .success-cloud {
@@ -627,6 +667,8 @@ tbody tr.cut-line-row td {
 .dashboard-name-pill {
   justify-content: center;
   font-weight: 700;
+  min-width: 0;
+  text-align: center;
 }
 
 .subdued-pill {
@@ -753,6 +795,7 @@ tbody tr.cut-line-row td {
 .form-grid label {
   display: grid;
   gap: 0.45rem;
+  align-content: start;
 }
 
 .checkbox-row {
@@ -968,6 +1011,7 @@ tbody tr.cut-line-row td {
   grid-auto-columns: minmax(260px, 1fr);
   gap: 1.5rem;
   min-width: max-content;
+  position: relative;
 }
 
 .bracket-round-column {
@@ -976,20 +1020,25 @@ tbody tr.cut-line-row td {
   align-content: center;
   padding: calc(var(--round-depth, 0) * 1.25rem) 0.2rem;
   position: relative;
+  z-index: 1;
 }
 
-.bracket-round-column::before {
-  content: "";
+.bracket-connector-layer {
   position: absolute;
-  top: 5.25rem;
-  right: -0.8rem;
-  bottom: 1rem;
-  width: 1px;
-  background: linear-gradient(180deg, rgba(126, 55, 23, 0.18), rgba(126, 55, 23, 0.04));
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.bracket-round-column:last-child::before {
-  display: none;
+.bracket-connector-path {
+  fill: none;
+  stroke: rgba(126, 55, 23, 0.26);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .final-round-column {
@@ -1016,16 +1065,6 @@ tbody tr.cut-line-row td {
   border: 1px solid rgba(96, 74, 43, 0.12);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 242, 233, 0.92));
   box-shadow: var(--shadow);
-}
-
-.bracket-round-column:not(:last-child) .bracket-match-card::after {
-  content: "";
-  position: absolute;
-  right: -1.5rem;
-  top: 50%;
-  width: 1.5rem;
-  height: 2px;
-  background: rgba(126, 55, 23, 0.24);
 }
 
 .placeholder-match-card {

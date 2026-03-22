@@ -48,7 +48,6 @@ export function TournamentEditPage() {
   const [deleting, setDeleting] = useState(false);
   const [formReady, setFormReady] = useState(false);
   const [addingParticipant, setAddingParticipant] = useState(false);
-  const [importingParticipants, setImportingParticipants] = useState(false);
   const [updatingPoints, setUpdatingPoints] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [creatingTieBreak, setCreatingTieBreak] = useState(false);
@@ -57,6 +56,7 @@ export function TournamentEditPage() {
   const tournamentDetail = tournament.data;
   const isSingleBracket = tournamentDetail?.format === "BRACKET";
   const isDoubleElimination = tournamentDetail?.format === "DOUBLE_ELIMINATION";
+  const canAddParticipants = tournamentDetail?.can_add_participants ?? false;
 
   const directoryEntries = useApiResource(async () => {
     if (!token || !tournamentDetail) return [];
@@ -230,26 +230,6 @@ export function TournamentEditPage() {
     }
   }
 
-  async function handleImportParticipants(file: File) {
-    if (importingParticipants) return;
-    setImportingParticipants(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const result = await api.importParticipants(token ?? "", tournamentId ?? "", file);
-      const details = [`Imported ${result.imported}`, `skipped ${result.skipped}`];
-      if (result.errors.length) {
-        details.push(`${result.errors.length} rows with issues`);
-      }
-      setMessage(details.join(", ") + ".");
-      await tournament.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to import participants");
-    } finally {
-      setImportingParticipants(false);
-    }
-  }
-
   async function handleCreateTieBreak() {
     if (creatingTieBreak) return;
     setCreatingTieBreak(true);
@@ -302,7 +282,7 @@ export function TournamentEditPage() {
   }
 
   return (
-    <PageShell mode="admin" title={tournamentDetail?.name ?? "Tournament management"} subtitle="Edit metadata, scoring, imports, exports, and live operations from one control room.">
+    <PageShell mode="admin" title={tournamentDetail?.name ?? "Tournament management"} subtitle="Edit metadata, scoring, and live operations from one control room.">
       {tournament.loading ? <div className="card">Loading tournament...</div> : null}
       {tournament.error ? <div className="card error-card">{tournament.error}</div> : null}
       {tournamentDetail ? (
@@ -350,11 +330,6 @@ export function TournamentEditPage() {
                 activeNames={tournamentDetail.qualified}
                 eliminatedNames={tournamentDetail.eliminated}
               />
-              <div className="button-row compact-row">
-                <button type="button" onClick={() => void api.exportStandingsCsv(token ?? "", tournamentDetail.id, tournamentDetail.slug)}>Export standings CSV</button>
-                <button type="button" onClick={() => void api.exportResultsCsv(token ?? "", tournamentDetail.id, tournamentDetail.slug)}>Export results CSV</button>
-                <button type="button" className="ghost-button" onClick={() => void api.downloadTournamentConfig(token ?? "", tournamentDetail.id, tournamentDetail.slug)}>Export config JSON</button>
-              </div>
             </div>
           </section>
 
@@ -363,38 +338,29 @@ export function TournamentEditPage() {
               <div className="section-heading">
                 <div>
                   <h2>Participants</h2>
-                  <p className="muted-text">Add one more entrant, or bulk import a CSV using the v2 workflow.</p>
+                  <p className="muted-text">{canAddParticipants ? "Add one more entrant manually or from the directory." : "Participant additions are locked after match generation."}</p>
                 </div>
               </div>
-              <form className="form-grid" onSubmit={(event) => void handleAddParticipant(event)}>
-                <label><span>Manual name</span><input value={addParticipantName} onChange={(event) => setAddParticipantName(event.target.value)} placeholder={tournamentDetail.participant_type === "TEAM" ? "New team name" : "New player name"} /></label>
-                <label>
-                  <span>{tournamentDetail.participant_type === "TEAM" ? "Directory team" : "Directory player"}</span>
-                  <select value={addParticipantDirectoryId} onChange={(event) => setAddParticipantDirectoryId(event.target.value)}>
-                    <option value="">None selected</option>
-                    {(directoryEntries.data ?? []).map((entry) => (
-                      <option key={entry.id} value={entry.id}>{entry.name}</option>
-                    ))}
-                  </select>
-                </label>
-                {tournamentDetail.participant_type === "TEAM" ? (
-                  <label><span>Roster members (one per line)</span><textarea rows={4} value={teamMembersInput} onChange={(event) => setTeamMembersInput(event.target.value)} /></label>
-                ) : null}
-                <div className="button-row compact-row">
-                  <button type="submit" disabled={addingParticipant}>{addingParticipant ? "Adding..." : "Add participant"}</button>
-                </div>
-              </form>
-              <label>
-                <span>Import participants CSV</span>
-                <input type="file" accept=".csv,text/csv" onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) {
-                    void handleImportParticipants(file);
-                    event.currentTarget.value = "";
-                  }
-                }} />
-              </label>
-              {importingParticipants ? <div className="chip-panel">Importing participants...</div> : null}
+              {canAddParticipants ? (
+                <form className="form-grid" onSubmit={(event) => void handleAddParticipant(event)}>
+                  <label><span>Manual name</span><input value={addParticipantName} onChange={(event) => setAddParticipantName(event.target.value)} placeholder={tournamentDetail.participant_type === "TEAM" ? "New team name" : "New player name"} /></label>
+                  <label>
+                    <span>{tournamentDetail.participant_type === "TEAM" ? "Directory team" : "Directory player"}</span>
+                    <select value={addParticipantDirectoryId} onChange={(event) => setAddParticipantDirectoryId(event.target.value)}>
+                      <option value="">None selected</option>
+                      {(directoryEntries.data ?? []).map((entry) => (
+                        <option key={entry.id} value={entry.id}>{entry.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {tournamentDetail.participant_type === "TEAM" ? (
+                    <label><span>Roster members (one per line)</span><textarea rows={4} value={teamMembersInput} onChange={(event) => setTeamMembersInput(event.target.value)} /></label>
+                  ) : null}
+                  <div className="button-row compact-row">
+                    <button type="submit" disabled={addingParticipant}>{addingParticipant ? "Adding..." : "Add participant"}</button>
+                  </div>
+                </form>
+              ) : null}
             </div>
 
             <div className="content-stack">
@@ -481,6 +447,7 @@ export function TournamentEditPage() {
             scoreLabel={tournamentDetail.stages[0]?.score_label}
             pointsScheme={tournamentDetail.stages[0]?.points_scheme ?? []}
             heading="Format explainer"
+            collapsible
           />
 
           {isSingleBracket && tournamentDetail.stages[0]?.rounds.length ? (

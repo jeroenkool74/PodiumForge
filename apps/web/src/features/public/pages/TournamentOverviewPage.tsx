@@ -24,7 +24,12 @@ export function TournamentOverviewPage() {
   const stageMatchCount = primaryStage?.rounds.reduce((sum, round) => sum + round.matches.length, 0) ?? 0;
 
   return (
-    <PageShell mode="public" title={data?.name ?? "Tournament overview"} subtitle={data?.description}>
+    <PageShell
+      mode="public"
+      title={data?.name ?? "Tournament overview"}
+      subtitle={data?.description}
+      actions={data ? <Link to={`/dashboard/${data.slug}/tv`}>TV mode</Link> : undefined}
+    >
       {loading ? <div className="card">Loading tournament...</div> : null}
       {error ? <div className="card error-card">{error}</div> : null}
       {data ? (
@@ -46,10 +51,10 @@ export function TournamentOverviewPage() {
                 <StatusPill value={data.status} />
               </div>
               <div>
-                <span className="eyebrow">Public views</span>
+                <span className="eyebrow">Live views</span>
                 <div className="button-row compact-row">
                   <Link to={`/tournaments/${data.slug}/standings`}>Standings</Link>
-                  <Link to={`/dashboard/${data.slug}`}>Dashboard</Link>
+                  <Link to={`/dashboard/${data.slug}/tv`}>TV mode</Link>
                 </div>
               </div>
             </div>
@@ -105,7 +110,7 @@ export function TournamentOverviewPage() {
                 <div className="button-row compact-row">
                   <Link to={`/tournaments/${data.slug}?tab=rounds`}>Open rounds</Link>
                   <Link to={`/tournaments/${data.slug}/standings`}>Open standings</Link>
-                  <Link to={`/dashboard/${data.slug}`}>Open dashboard</Link>
+                  <Link to={`/dashboard/${data.slug}/tv`}>Open TV mode</Link>
                   {isTeamTournament ? <Link to={`/tournaments/${data.slug}/teams`}>Open teams</Link> : null}
                   <Link to={`/tournaments/${data.slug}/print`}>Print standings</Link>
                 </div>

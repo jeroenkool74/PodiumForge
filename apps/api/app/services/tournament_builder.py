@@ -653,13 +653,7 @@ def add_participant(
         [participant.display_name for participant in tournament.participants]
         + [display_name]
     )
-    stage = sorted(tournament.stages, key=lambda item: item.order_index)[0]
-    existing_rounds = sorted(stage.rounds, key=lambda item: item.number)
-    if any(
-        match.participants
-        for round_item in existing_rounds
-        for match in round_item.matches
-    ):
+    if not can_add_participants(tournament):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot add participants after match generation in this MVP",
@@ -680,6 +674,18 @@ def add_participant(
     db.commit()
     db.refresh(participant)
     return participant
+
+
+def can_add_participants(tournament: Tournament) -> bool:
+    if not tournament.stages:
+        return True
+    stage = sorted(tournament.stages, key=lambda item: item.order_index)[0]
+    existing_rounds = sorted(stage.rounds, key=lambda item: item.number)
+    return not any(
+        match.participants
+        for round_item in existing_rounds
+        for match in round_item.matches
+    )
 
 
 def expected_round_count(

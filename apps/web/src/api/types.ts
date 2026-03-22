@@ -146,6 +146,7 @@ export interface TournamentDetail {
   standings: StandingEntry[];
   qualified: string[];
   eliminated: string[];
+  can_add_participants: boolean;
   can_generate_next_round: boolean;
 }
 
@@ -232,28 +233,6 @@ export interface TieBreakRuleRecord {
   };
 }
 
-export interface TournamentConfigParticipant {
-  name: string;
-  members: string[];
-}
-
-export interface TournamentConfigExport {
-  name: string;
-  description: string;
-  format: string;
-  participant_type: string;
-  match_size: number;
-  advance_count?: number | null;
-  round_count?: number | null;
-  is_public: boolean;
-  leaderboard_metric: string;
-  score_direction: string;
-  score_label: string;
-  points_scheme: PlacementPoint[];
-  tie_break_rules: TieBreakRuleRecord[];
-  participants: TournamentConfigParticipant[];
-}
-
 export interface PublicTeam {
   id: string;
   name: string;
@@ -265,10 +244,4 @@ export interface PublicTeamsResponse {
   tournament_name: string;
   participant_type: string;
   teams: PublicTeam[];
-}
-
-export interface ParticipantImportResult {
-  imported: number;
-  skipped: number;
-  errors: string[];
 }

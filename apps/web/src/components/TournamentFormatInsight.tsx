@@ -13,6 +13,8 @@ interface TournamentFormatInsightProps {
   scoreLabel?: string;
   pointsScheme?: PlacementPoint[];
   heading?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }
 
 function advanceSummary(format: string, advanceCount: number | null) {
@@ -97,104 +99,128 @@ export function TournamentFormatInsight({
   scoreLabel = "Score",
   pointsScheme = [],
   heading = "Format guide",
+  collapsible = false,
+  defaultOpen = false,
 }: TournamentFormatInsightProps) {
   const guide = getTournamentFormatGuide(format);
   const sortedPoints = sortPointsScheme(pointsScheme);
   const roundEstimate = estimateRoundCount(format, participantCount, matchSize ?? 2, advanceCount, roundCount);
   const setupSummary = structureSummary(format, participantCount, matchSize, advanceCount, roundCount);
 
-  return (
-    <section className="card format-insight-card">
-      <div className="card-header-row">
-        <div>
-          <span className="eyebrow">{heading}</span>
-          <h2>{guide.label}</h2>
-          <p className="muted-text">{guide.tagline}</p>
+  const header = (
+    <div className="card-header-row">
+      <div>
+        <span className="eyebrow">{heading}</span>
+        <h2>{guide.label}</h2>
+        <p className="muted-text">{guide.tagline}</p>
+      </div>
+    </div>
+  );
+
+  const grid = (
+    <div className="format-insight-grid">
+      <div className="content-stack">
+        <p>{guide.description}</p>
+        <div className="format-metric-grid">
+          <div className="mini-card format-metric-card">
+            <strong>Entrants</strong>
+            <span>{participantCount || "-"}</span>
+          </div>
+          <div className="mini-card format-metric-card">
+            <strong>Match size</strong>
+            <span>{usesFixedHeadToHeadMatches(format) ? 2 : matchSize ?? "-"}</span>
+          </div>
+          <div className="mini-card format-metric-card">
+            <strong>Advancement</strong>
+            <span>{advanceSummary(format, advanceCount)}</span>
+          </div>
+          <div className="mini-card format-metric-card">
+            <strong>Expected rounds</strong>
+            <span>{roundEstimate || "-"}</span>
+          </div>
+          <div className="mini-card format-metric-card">
+            <strong>Leaderboard</strong>
+            <span>{leaderboardMetricLabel(leaderboardMetric)}</span>
+          </div>
+          <div className="mini-card format-metric-card">
+            <strong>{scoreLabel}</strong>
+            <span>{scoreDirectionLabel(scoreDirection)}</span>
+          </div>
+        </div>
+
+        <div className="content-stack">
+          <h3>How it plays</h3>
+          <ul className="feature-list">
+            {guide.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="mini-card note-card">
+          <strong>Best for</strong>
+          <p>{guide.bestFor}</p>
+        </div>
+
+        <div className="mini-card note-card">
+          <strong>What this setup creates</strong>
+          <p>{setupSummary}</p>
         </div>
       </div>
 
-      <div className="format-insight-grid">
-        <div className="content-stack">
-          <p>{guide.description}</p>
-          <div className="format-metric-grid">
-            <div className="mini-card format-metric-card">
-              <strong>Entrants</strong>
-              <span>{participantCount || "-"}</span>
-            </div>
-            <div className="mini-card format-metric-card">
-              <strong>Match size</strong>
-              <span>{usesFixedHeadToHeadMatches(format) ? 2 : matchSize ?? "-"}</span>
-            </div>
-            <div className="mini-card format-metric-card">
-              <strong>Advancement</strong>
-              <span>{advanceSummary(format, advanceCount)}</span>
-            </div>
-            <div className="mini-card format-metric-card">
-              <strong>Expected rounds</strong>
-              <span>{roundEstimate || "-"}</span>
-            </div>
-            <div className="mini-card format-metric-card">
-              <strong>Leaderboard</strong>
-              <span>{leaderboardMetricLabel(leaderboardMetric)}</span>
-            </div>
-            <div className="mini-card format-metric-card">
-              <strong>{scoreLabel}</strong>
-              <span>{scoreDirectionLabel(scoreDirection)}</span>
-            </div>
-          </div>
-
-          <div className="content-stack">
-            <h3>How it plays</h3>
-            <ul className="feature-list">
-              {guide.steps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="mini-card note-card">
-            <strong>Best for</strong>
-            <p>{guide.bestFor}</p>
-          </div>
-
-          <div className="mini-card note-card">
-            <strong>What this setup creates</strong>
-            <p>{setupSummary}</p>
-          </div>
-        </div>
-
-        <div className="content-stack">
-          <div className="scheme-preview-grid">
-            {guide.preview.map((column) => (
-              <div key={column.label} className="scheme-preview-column">
-                <span className="eyebrow">{column.label}</span>
-                <div className="scheme-preview-stack">
-                  {column.slots.map((slot) => (
-                    <div key={slot} className="scheme-preview-slot">
-                      {slot}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mini-card note-card">
-            <strong>Points at a glance</strong>
-            {sortedPoints.length ? (
-              <div className="points-preview-row">
-                {sortedPoints.slice(0, 6).map((item) => (
-                  <div key={`${item.placement}-${item.points}`} className="points-preview-pill">
-                    <span>{placementPreviewLabel(item.placement)}</span>
-                    <strong>{item.points} pts</strong>
+      <div className="content-stack">
+        <div className="scheme-preview-grid">
+          {guide.preview.map((column) => (
+            <div key={column.label} className="scheme-preview-column">
+              <span className="eyebrow">{column.label}</span>
+              <div className="scheme-preview-stack">
+                {column.slots.map((slot) => (
+                  <div key={slot} className="scheme-preview-slot">
+                    {slot}
                   </div>
                 ))}
               </div>
-            ) : null}
-            <p>{guide.scoringHint}</p>
-          </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mini-card note-card">
+          <strong>Points at a glance</strong>
+          {sortedPoints.length ? (
+            <div className="points-preview-row">
+              {sortedPoints.slice(0, 6).map((item) => (
+                <div key={`${item.placement}-${item.points}`} className="points-preview-pill">
+                  <span>{placementPreviewLabel(item.placement)}</span>
+                  <strong>{item.points} pts</strong>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <p>{guide.scoringHint}</p>
         </div>
       </div>
-    </section>
+    </div>
+  );
+
+  if (collapsible) {
+    return (
+      <details className="card format-insight-card collapsible-card" open={defaultOpen}>
+        <summary className="collapsible-summary">
+          <span className="collapsible-summary-copy">
+            <span className="eyebrow">{heading}</span>
+            <strong>{guide.label}</strong>
+            <span className="muted-text">{guide.tagline}</span>
+          </span>
+          <span className="muted-text collapsible-summary-hint">Show details</span>
+        </summary>
+        <div className="collapsible-content">
+          {grid}
+        </div>
+      </details>
+    );
+  }
+
+  return (
+    <section className="card format-insight-card">{header}{grid}</section>
   );
 }

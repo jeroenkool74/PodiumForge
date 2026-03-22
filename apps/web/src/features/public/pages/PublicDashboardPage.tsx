@@ -6,7 +6,6 @@ import type { DashboardRecord } from "../../../api/types";
 import { BracketBoard } from "../../../components/BracketBoard";
 import { DoubleEliminationBoard } from "../../../components/DoubleEliminationBoard";
 import { PageShell } from "../../../components/PageShell";
-import { PublicTournamentTabs } from "../../../components/PublicTournamentTabs";
 import { StatusPill } from "../../../components/StatusPill";
 import { dashboardSubtitle, tournamentPulse } from "../../tournaments/formatMeta";
 import { standingPositionLabel } from "../../tournaments/standingPresentation";
@@ -289,14 +288,14 @@ export function PublicDashboardPage({ immersive = false }: { immersive?: boolean
   return (
     <PageShell
       mode="public"
-      title={data?.tournament_name ?? "Tournament dashboard"}
+      title={data?.tournament_name ?? "Tournament TV"}
       subtitle={dashboardSubtitle(data?.tournament_format)}
       immersive={immersive}
       actions={
         slug ? (
           <div className="button-row compact-row">
-            <Link to={immersive ? `/dashboard/${slug}` : `/dashboard/${slug}/tv`}>
-              {immersive ? "Standard view" : "TV mode"}
+            <Link to={immersive ? `/tournaments/${slug}` : `/dashboard/${slug}/tv`}>
+              {immersive ? "Overview" : "TV mode"}
             </Link>
           </div>
         ) : null
@@ -306,8 +305,6 @@ export function PublicDashboardPage({ immersive = false }: { immersive?: boolean
       {error ? <div className="card error-card">{error}</div> : null}
       {data ? (
         <>
-          {!immersive ? <PublicTournamentTabs slug={data.tournament_slug} current="dashboard" /> : null}
-
           <section className="card dashboard-spotlight-card">
             <div className="dashboard-spotlight-copy">
               <span className="eyebrow">{formatLabel}</span>

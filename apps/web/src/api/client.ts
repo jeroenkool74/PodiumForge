@@ -6,14 +6,13 @@ import type {
   DirectoryTeam,
   MatchRecord,
   MatchResultPayload,
-  ParticipantImportResult,
+  PlacementPoint,
   PublicTeamsResponse,
   RoundRecord,
   StandingEntry,
   TieBreakRuleRecord,
   TokenResponse,
   TournamentCard,
-  TournamentConfigExport,
   TournamentCreatePayload,
   TournamentDetail,
   TournamentUpdatePayload,
@@ -112,36 +111,6 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   return response.json() as Promise<T>;
 }
 
-async function download(path: string, filename: string, token: string) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    let message = "Request failed";
-    try {
-      const errorBody = await response.json();
-      message = formatApiError(errorBody.detail ?? errorBody.message ?? errorBody);
-    } catch {
-      message = response.statusText || message;
-    }
-    throw new Error(message);
-  }
-
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  window.URL.revokeObjectURL(url);
-}
-
 export const api = {
   login: (login: string, password: string) =>
     request<TokenResponse>("/auth/login", {
@@ -175,7 +144,7 @@ export const api = {
     request<TournamentDetail>("/tournaments", { method: "POST", body: JSON.stringify(payload) }, token),
   updateTournament: (token: string, tournamentId: string, payload: TournamentUpdatePayload) =>
     request<TournamentDetail>(`/tournaments/${tournamentId}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
-  updatePointsScheme: (token: string, tournamentId: string, pointsScheme: TournamentConfigExport["points_scheme"]) =>
+  updatePointsScheme: (token: string, tournamentId: string, pointsScheme: PlacementPoint[]) =>
     request<TournamentDetail>(`/tournaments/${tournamentId}/points-scheme`, { method: "PATCH", body: JSON.stringify({ points_scheme: pointsScheme }) }, token),
   recalculatePoints: (token: string, tournamentId: string) =>
     request<{ recalculated: number; total_results: number; message: string }>(`/tournaments/${tournamentId}/recalculate-points`, { method: "POST" }, token),
@@ -185,11 +154,6 @@ export const api = {
     request<RoundRecord>(`/tournaments/${tournamentId}/rounds/next`, { method: "POST" }, token),
   addParticipant: (token: string, tournamentId: string, payload: { display_name: string; directory_entry_id?: string; seed_number?: number; team_members?: string[] }) =>
     request<TournamentDetail["participants"][number]>(`/tournaments/${tournamentId}/participants`, { method: "POST", body: JSON.stringify(payload) }, token),
-  importParticipants: async (token: string, tournamentId: string, file: File): Promise<ParticipantImportResult> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    return request<ParticipantImportResult>(`/tournaments/${tournamentId}/participants/import`, { method: "POST", body: formData }, token);
-  },
   getTieBreakRules: (token: string, tournamentId: string) => request<TieBreakRuleRecord[]>(`/tournaments/${tournamentId}/tie-break-rules`, {}, token),
   createTieBreakRule: (token: string, tournamentId: string, payload: Omit<TieBreakRuleRecord, "id">) =>
     request<TieBreakRuleRecord>(`/tournaments/${tournamentId}/tie-break-rules`, { method: "POST", body: JSON.stringify(payload) }, token),
@@ -197,25 +161,6 @@ export const api = {
     request<TieBreakRuleRecord>(`/tournaments/${tournamentId}/tie-break-rules/${ruleId}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
   deleteTieBreakRule: (token: string, tournamentId: string, ruleId: string) =>
     request<{ deleted: boolean; rule_id: string }>(`/tournaments/${tournamentId}/tie-break-rules/${ruleId}`, { method: "DELETE" }, token),
-  exportStandingsCsv: (token: string, tournamentId: string, slug: string) =>
-    download(`/tournaments/${tournamentId}/export/standings`, `${slug}-standings.csv`, token),
-  exportResultsCsv: (token: string, tournamentId: string, slug: string) =>
-    download(`/tournaments/${tournamentId}/export/results`, `${slug}-results.csv`, token),
-  exportTournamentConfig: (token: string, tournamentId: string) => request<TournamentConfigExport>(`/tournaments/${tournamentId}/export`, {}, token),
-  downloadTournamentConfig: async (token: string, tournamentId: string, slug: string) => {
-    const config = await api.exportTournamentConfig(token, tournamentId);
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${slug}-config.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    window.URL.revokeObjectURL(url);
-  },
-  importTournamentConfig: (token: string, payload: TournamentConfigExport) =>
-    request<TournamentDetail>("/tournaments/import", { method: "POST", body: JSON.stringify(payload) }, token),
 
   listDirectoryPlayers: (token: string) => request<DirectoryPlayer[]>("/directory/players", {}, token),
   createDirectoryPlayer: (token: string, payload: { name: string }) => request<DirectoryPlayer>("/directory/players", { method: "POST", body: JSON.stringify(payload) }, token),
@@ -240,8 +185,6 @@ export const api = {
   saveMatchResults: (token: string, matchId: string, payload: MatchResultPayload) =>
     request<MatchRecord>(`/matches/${matchId}/results`, { method: "POST", body: JSON.stringify(payload) }, token),
   clearMatchResults: (token: string, matchId: string) => request<MatchRecord>(`/matches/${matchId}/results`, { method: "DELETE" }, token),
-  scheduleMatch: (token: string, matchId: string, scheduledAt: string | null) =>
-    request<MatchRecord>(`/matches/${matchId}/schedule`, { method: "PATCH", body: JSON.stringify({ scheduled_at: scheduledAt }) }, token),
 
   getProtectedStandings: (token: string, tournamentId: string) => request<StandingEntry[]>(`/standings/tournaments/${tournamentId}`, {}, token),
 };
