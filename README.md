@@ -1,6 +1,6 @@
-# PodiumForge v3
+# PodiumForge
 
-PodiumForge v3 is a self-hosted local-first tournament manager that combines the richer format engine and public views from version 1 with the operational tooling from version 2.
+PodiumForge is a self-hosted local-first tournament manager that combines the richer format engine and public views from version 1 with the operational tooling from version 2.
 
 It is built for events where a match can have 3, 4, 5, or more entrants and produces an ordered result such as 1st through 5th place. The MVP focuses on LAN parties, board game nights, scouting activities, and other local events where classic 1v1 brackets are not enough.
 

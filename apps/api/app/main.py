@@ -12,7 +12,7 @@ from app.core.config import get_settings
 def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
-        title="PodiumForge v3 API",
+        title="PodiumForge API",
         version="0.1.0",
         description="Local-first tournament management API with merged v1 and v2 features.",
     )

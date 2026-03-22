@@ -26,7 +26,7 @@ export function PageShell({ mode, title, subtitle, actions, immersive = false, c
       <header className={`hero-bar ${immersive ? "immersive-hero-bar" : ""}`}>
         <div>
           <NavLink to="/" className="brand-mark">
-            PodiumForge v3
+            PodiumForge
           </NavLink>
           {!immersive ? <p className="hero-kicker">{heroKicker}</p> : null}
           <h1>{title}</h1>
